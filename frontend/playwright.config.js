@@ -13,11 +13,11 @@ export default defineConfig({
   use: { baseURL: 'http://localhost:4173', trace: 'off', ...devices['Desktop Chrome'] },
   webServer: [
     {
-      command: 'RATE_LIMIT_EXPENSIVE_PER_MIN=500 RATE_LIMIT_PER_MIN=1000 RATE_LIMIT_CHEAP_PER_MIN=5000 SOLVER_CONCURRENCY=8 ALLOWED_ORIGINS=http://localhost:4173,http://localhost:4175 LLM_API_KEY= LLM_MODEL= .venv/bin/uvicorn app.main:app --port 8010 --log-level warning',
+      command: 'RATE_LIMIT_EXPENSIVE_PER_MIN=500 RATE_LIMIT_PER_MIN=1000 RATE_LIMIT_CHEAP_PER_MIN=5000 SOLVER_CONCURRENCY=8 CORS_ORIGINS=http://localhost:4173,http://localhost:4175 OPENROUTER_API_KEY= LLM_MODEL= .venv/bin/uvicorn app.main:app --port 8010 --log-level warning',
       cwd: '../backend', url: 'http://localhost:8010/health', reuseExistingServer: false, timeout: 60_000,
     },
     {
-      command: 'node scripts/sync-proof.mjs && VITE_API_BASE_URL=http://localhost:8010 npx vite build --outDir dist-e2e && VITE_API_BASE_URL=http://localhost:8010 node scripts/write-host-config.mjs dist-e2e && npx vite preview --outDir dist-e2e --port 4173 --strictPort',
+      command: 'node scripts/sync-proof.mjs && VITE_API_BASE=http://localhost:8010 npx vite build --outDir dist-e2e && VITE_API_BASE=http://localhost:8010 node scripts/write-host-config.mjs dist-e2e && npx vite preview --outDir dist-e2e --port 4173 --strictPort',
       url: 'http://localhost:4173', reuseExistingServer: false, timeout: 120_000,
     },
   ],

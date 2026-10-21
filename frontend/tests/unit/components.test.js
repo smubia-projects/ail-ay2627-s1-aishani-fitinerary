@@ -52,7 +52,7 @@ describe('ErrorPanel is the separate component for real errors', () => {
     expect(w.text()).toContain('internal_error')
   })
   it('explains solver_busy as capacity exhaustion and does not imply an automatic retry', () => {
-    const w = mount(ErrorPanel, { props: { error: { message: 'The itinerary solver is busy.', code: 'solver_busy', status: 503, retryAfter: 3 } } })
+    const w = mount(ErrorPanel, { props: { error: { message: 'The itinerary solver is busy.', code: 'solver_busy', status: 423, retryAfter: 3 } } })
     expect(w.text()).toContain('Solver is busy')
     expect(w.text()).toContain('No request was started')
     expect(w.text()).toContain('3 seconds')
@@ -166,13 +166,13 @@ describe('static safety guards (decision 10 and XSS)', () => {
       expect(t, f).not.toMatch(/localStorage|sessionStorage|indexedDB|document\.cookie|\bgtag\b|dataLayer|googletagmanager|plausible|mixpanel/i)
     }
   })
-  it('reads only VITE_API_BASE_URL from the environment and never mentions an LLM key', () => {
+  it('reads only VITE_API_BASE from the environment and never mentions an LLM key', () => {
     const envs = new Set()
     for (const f of files) {
       const t = readFileSync(f, 'utf8')
       for (const m of t.matchAll(/import\.meta\.env\??\.([A-Z_]+)/g)) envs.add(m[1])
       expect(t, f).not.toMatch(/LLM_API_KEY|ANTHROPIC|api[_-]?key/i)
     }
-    expect([...envs]).toEqual(['VITE_API_BASE_URL'])
+    expect([...envs]).toEqual(['VITE_API_BASE'])
   })
 })
