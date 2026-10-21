@@ -93,7 +93,7 @@ def test_results_are_per_city_and_never_pooled():
 
 
 def _cli(*args, env=None):
-    base = {k: v for k, v in os.environ.items() if k not in ("RUN_LIVE_LLM_EVAL", "LLM_API_KEY", "LLM_MODEL")}
+    base = {k: v for k, v in os.environ.items() if k not in ("RUN_LIVE_LLM_EVAL", "OPENROUTER_API_KEY", "LLM_MODEL")}
     return subprocess.run([sys.executable, str(BACKEND / "scripts" / "score_gold.py"), *args], capture_output=True, text=True, cwd=BACKEND,
                           env={**base, "LIVE_ENV_FILE": "/nonexistent", **(env or {})}, timeout=300)
 
@@ -107,4 +107,4 @@ def test_live_flag_without_opt_in_or_key_does_nothing(tmp_path):
     r = _cli("--live", env={"GOLD_OUT_DIR": str(tmp_path)})
     assert "opt-in" in r.stdout and list(tmp_path.iterdir()) == []
     r = _cli("--live", env={"GOLD_OUT_DIR": str(tmp_path), "RUN_LIVE_LLM_EVAL": "1"})
-    assert "LLM_API_KEY and LLM_MODEL are not set" in r.stdout and list(tmp_path.iterdir()) == []
+    assert "OPENROUTER_API_KEY and LLM_MODEL are not set" in r.stdout and list(tmp_path.iterdir()) == []

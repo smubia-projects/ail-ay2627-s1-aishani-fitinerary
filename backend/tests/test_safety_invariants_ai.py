@@ -115,7 +115,7 @@ def test_a_provisional_repair_is_never_labelled_verified(api):
 
 
 def test_nothing_sensitive_leaks_through_a_repair_proposal_or_a_style_proposal(api, monkeypatch):
-    monkeypatch.setenv("LLM_API_KEY", SECRET)
+    monkeypatch.setenv("OPENROUTER_API_KEY", SECRET)
 
     class Leaky(MockLLM):
         def complete(self, system, messages, max_tokens):

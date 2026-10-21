@@ -232,7 +232,7 @@ def test_input_validation():
 
 # ---- API --------------------------------------------------------------------------------
 def test_api_compare_hotels_works_in_sample_mode(monkeypatch):
-    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     body = {"preferences": tiny(nights=1).model_dump(), "hotel_ids": [ASA, ODA], "include_sensitivity": True}
     with TestClient(app) as client:
         assert client.get("/health").json()["mode"] == "sample"

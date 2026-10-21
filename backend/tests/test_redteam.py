@@ -147,7 +147,7 @@ def _run_live(monkeypatch, tmp_path, kind="gullible"):
             body = {"days": int(m.group()) if m and 1 <= int(m.group()) <= 7 else None, "budget": None, "pace": None, "interests": [], "must_visit_names": [], "skip_names": [], "day_start": None, "day_end": None,
                     "value_of_time": None, "max_walking_minutes": None, "unclear": ([] if kind == "harmless" else [system[:150]])}
             return LLMResponse(text=json.dumps(body), input_tokens=1, output_tokens=1, latency_seconds=0.0)
-    monkeypatch.setattr("app.llm.client.AnthropicLLMClient.from_env", staticmethod(lambda: Fake()))
+    monkeypatch.setattr("app.llm.client.OpenRouterLLMClient.from_env", staticmethod(lambda: Fake()))
     return live.main()
 
 

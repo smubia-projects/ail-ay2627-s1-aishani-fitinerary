@@ -33,7 +33,7 @@ def _run_live(monkeypatch, tmp_path, label):
     monkeypatch.setattr(sg.lc, "gate", lambda *a: None)
     monkeypatch.setattr(sg.lc, "load_env_file", lambda: None)
     monkeypatch.setattr(sg.lc, "endpoint_stamp", lambda c: "Endpoint: relay.example.test (served via a third-party relay).")
-    monkeypatch.setattr("app.llm.client.AnthropicLLMClient.from_env", staticmethod(lambda: tgs.Oracle()))
+    monkeypatch.setattr("app.llm.client.OpenRouterLLMClient.from_env", staticmethod(lambda: tgs.Oracle()))
     monkeypatch.setattr(sys, "argv", ["score_gold.py", "--live", "--label", label])
     return sg.main()
 

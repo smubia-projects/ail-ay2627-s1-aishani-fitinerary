@@ -468,7 +468,7 @@ def test_evaluation_never_imports_the_live_llm_client():
                 assert name in allowed_from_client, f"{f.name} imports {name} from app.llm.client"
             assert not (module == "app.llm" and name == "client"), f.name
         text = f.read_text()
-        assert "get_llm_client" not in text and "AnthropicLLMClient" not in text and "LLM_API_KEY" not in text, f.name
+        assert "get_llm_client" not in text and "OpenRouterLLMClient" not in text and "OPENROUTER_API_KEY" not in text, f.name
 
 
 def test_independent_module_imports_nothing_from_the_optimiser_or_validator():
@@ -481,7 +481,7 @@ def test_independent_module_imports_nothing_from_the_optimiser_or_validator():
 # ---------------------------------------------------------------------------------------------------------------------
 def test_quick_mode_runs_end_to_end_offline_in_under_a_minute_and_writes_every_output(tmp_path, monkeypatch):
     monkeypatch.setitem(sys.modules, "anthropic", None)          # any attempt to import the SDK raises ImportError (scenarios would FAIL)
-    for var in ("LLM_API_KEY", "LLM_MODEL"):
+    for var in ("OPENROUTER_API_KEY", "LLM_MODEL"):
         monkeypatch.delenv(var, raising=False)
     sys.path.insert(0, str(BACKEND / "scripts"))
     try:

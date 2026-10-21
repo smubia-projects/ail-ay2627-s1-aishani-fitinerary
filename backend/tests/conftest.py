@@ -115,7 +115,7 @@ def _no_network_no_keys(monkeypatch, request):
     monkeypatch.setattr(socket.socket, "connect", connect)
     monkeypatch.setattr(socket.socket, "connect_ex", connect_ex)
     monkeypatch.setattr(socket, "create_connection", create_connection)
-    for var in ("LLM_API_KEY", "LLM_MODEL", "LLM_BASE_URL", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"):
+    for var in ("OPENROUTER_API_KEY", "LLM_MODEL", "UPSTASH_REDIS_REST_URL", "UPSTASH_REDIS_REST_TOKEN", "UPSTASH_REDIS_URL", "UPSTASH_REDIS_TOKEN"):
         monkeypatch.delenv(var, raising=False)
 
 

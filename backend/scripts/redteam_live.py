@@ -1,7 +1,7 @@
 """OPT-IN: send a stratified sample of the SAME red-team attacks (tests/fixtures/redteam_attacks.json) to the REAL model through the real pipeline and report, per
 attack, whether the model's RAW reply tried to comply and whether the FINAL result a user would see was affected. Writes docs/redteam-live.md.
 
-  RUN_LIVE_LLM_EVAL=1 python scripts/redteam_live.py            (needs LLM_API_KEY and LLM_MODEL; hard cap config.REDTEAM_LIVE_MAX_CALLS = 60 calls)
+  RUN_LIVE_LLM_EVAL=1 python scripts/redteam_live.py            (needs OPENROUTER_API_KEY and LLM_MODEL; hard cap config.REDTEAM_LIVE_MAX_CALLS = 60 calls)
 
 The key and the prompts are never printed or written; the report holds the attack ids, the outcomes and the effects only. Small N, one model, one run: indicative.
 Nothing is written if the run is aborted. Output folder override (tests): REDTEAM_OUT_DIR."""
@@ -103,9 +103,9 @@ def main() -> int:
     if msg:
         print(msg)
         return 0
-    from app.llm.client import AnthropicLLMClient
+    from app.llm.client import OpenRouterLLMClient
 
-    client = lc.Capped(AnthropicLLMClient.from_env(), config.REDTEAM_LIVE_MAX_CALLS)
+    client = lc.Capped(OpenRouterLLMClient.from_env(), config.REDTEAM_LIVE_MAX_CALLS)
     world = rl.World()
     cases = []
     try:

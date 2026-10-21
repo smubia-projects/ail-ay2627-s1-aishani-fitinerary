@@ -1,5 +1,5 @@
 """Shared pieces for the opt-in live scripts (ai_selfcheck.py, score_gold.py). Import-safe: nothing here calls a model or reads a key by itself.
-The key is read only by AnthropicLLMClient.from_env(); this module never prints it."""
+The key is read only by OpenRouterLLMClient.from_env(); this module never prints it."""
 import os
 import subprocess
 from pathlib import Path
@@ -9,14 +9,14 @@ REPO = ROOT.parent
 
 from app import config  # noqa: E402
 from app.llm.client import LLMResponse, LLMUnavailable  # noqa: E402
-from app.llm.endpoint import DEFAULT_HOST, resolve_endpoint  # noqa: E402
+from app.llm.client import OPENROUTER_HOST as DEFAULT_HOST  # noqa: E402
 from app.optimiser.hotel_compare import compare_hotels  # noqa: E402
 from app.schemas import Preferences  # noqa: E402
 
 FATAL = {"authentication", "api_error"}  # no point spending more calls: the key or the model name is wrong
 ADVICE = {
-    "authentication": "The key was rejected by {host}. Check that LLM_API_KEY is a current key for that service (not a key for a different provider or gateway) and has no stray spaces or quotes.",
-    "api_error": "{host} returned an error. The most common cause is an invalid model name in LLM_MODEL (set to '{model}'): check the exact model ID your service offers. If LLM_BASE_URL is set, also check it is the gateway's root domain with no /v1.",
+    "authentication": "The key was rejected by {host}. Check that OPENROUTER_API_KEY is a current key for that service (not a key for a different provider or gateway) and has no stray spaces or quotes.",
+    "api_error": "{host} returned an error. The most common cause is an invalid model name in LLM_MODEL (set to '{model}'): check the exact model ID your service offers. Model ids look like 'anthropic/claude-haiku-4.5' (see https://openrouter.ai/models).",
     "network": "{host} could not be reached. Check your internet connection and any proxy or firewall settings.",
     "timeout": "The API did not answer in time.",
     "rate_limited": "The API rate-limited the request. Wait a minute and run again.",
@@ -43,7 +43,7 @@ class Capped:
     def __init__(self, inner, cap: int):
         self.inner, self.cap, self.model = inner, cap, inner.model
         self.host = getattr(inner, "endpoint_host", None) or DEFAULT_HOST
-        self.relay = bool(getattr(getattr(inner, "endpoint", None), "relay", False))
+        self.relay = bool(getattr(inner, "relay", False))
         self.total_calls = 0
         self.log: list[LLMResponse] = []
         self.failures: list[str] = []
@@ -76,11 +76,8 @@ def endpoint_stamp(client) -> str:
 def gate(script: str, cap: int) -> str | None:
     """None when a live run may proceed, otherwise the plain message to print. Never echoes the key."""
     if os.environ.get("RUN_LIVE_LLM_EVAL") != "1":
-        return f"{script} is opt-in and made no model calls. To run it: RUN_LIVE_LLM_EVAL=1 plus LLM_API_KEY and LLM_MODEL (at most {cap} calls)."
-    bad = resolve_endpoint(os.environ.get("LLM_BASE_URL")).error
-    if bad:
-        return f"Cannot run live: {bad} Fix LLM_BASE_URL (the gateway's root domain, https, no /v1) or remove it. Nothing was called."
-    missing = [v for v in ("LLM_API_KEY", "LLM_MODEL") if not os.environ.get(v)]
+        return f"{script} is opt-in and made no model calls. To run it: RUN_LIVE_LLM_EVAL=1 plus OPENROUTER_API_KEY and LLM_MODEL (at most {cap} calls)."
+    missing = [v for v in ("OPENROUTER_API_KEY", "LLM_MODEL") if not os.environ.get(v)]
     if missing:
         return (f"Cannot run live: {' and '.join(missing)} {'is' if len(missing) == 1 else 'are'} not set. Put {'it' if len(missing) == 1 else 'them'} in backend/.env (copy .env.example) "
                 f"or export them in this shell, then run again. Nothing was called.")

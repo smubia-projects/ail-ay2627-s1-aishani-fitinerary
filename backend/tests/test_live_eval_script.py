@@ -42,7 +42,7 @@ def test_each_city_has_six_prompts_covering_every_kind_and_the_expectations_are_
 
 
 def _run(*args, env=None):
-    base = {k: v for k, v in os.environ.items() if k not in ("RUN_LIVE_LLM_EVAL", "LLM_API_KEY", "LLM_MODEL")}
+    base = {k: v for k, v in os.environ.items() if k not in ("RUN_LIVE_LLM_EVAL", "OPENROUTER_API_KEY", "LLM_MODEL")}
     return subprocess.run([sys.executable, str(SCRIPT), *args], capture_output=True, text=True, cwd=BACKEND, env={**base, **(env or {})}, timeout=120)
 
 
@@ -79,10 +79,10 @@ class FakeClient:
 
 def test_the_script_runs_end_to_end_with_a_mock_client_and_reports_every_city(tmp_path, monkeypatch):
     monkeypatch.setenv("RUN_LIVE_LLM_EVAL", "1")
-    monkeypatch.setenv("LLM_API_KEY", "not-a-real-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "not-a-real-key")
     monkeypatch.setenv("LLM_MODEL", "mock-model")
     monkeypatch.setenv("LIVE_EVAL_OUT_DIR", str(tmp_path))
-    monkeypatch.setattr("app.llm.client.AnthropicLLMClient.from_env", FakeClient.from_env)
+    monkeypatch.setattr("app.llm.client.OpenRouterLLMClient.from_env", FakeClient.from_env)
     monkeypatch.setattr(sys, "argv", [str(SCRIPT)])
     runpy.run_path(str(SCRIPT), run_name="__main__")
     md = (tmp_path / "llm-live-eval.md").read_text()

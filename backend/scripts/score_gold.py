@@ -3,7 +3,7 @@
   Default (no key, zero model calls):   python scripts/score_gold.py
       scores a deterministic RULE-BASED STAND-IN for the model (regexes and alias scanning). It is a floor/reference that exercises the same
       validation pipeline; it says NOTHING about any language model. Writes docs/eval/gold-results-mock.md.
-  Live (opt-in):  RUN_LIVE_LLM_EVAL=1 python scripts/score_gold.py --live --label first-run     (needs LLM_API_KEY and LLM_MODEL; hard cap config.GOLD_MAX_CALLS)
+  Live (opt-in):  RUN_LIVE_LLM_EVAL=1 python scripts/score_gold.py --live --label first-run     (needs OPENROUTER_API_KEY and LLM_MODEL; hard cap config.GOLD_MAX_CALLS)
       scores the real model on ALL gold prompts through the same pipeline. Every run writes a NEW file docs/eval/gold-results-live-<UTC timestamp>-<label>.md and never
       overwrites an earlier one (so the first run's numbers survive later fixes). Nothing is written if the run is aborted. Copy the files you want shown on the Proof page to
       docs/eval/gold-results-live-first-run.md. The Proof page picks the NEWEST timestamped file that is not the first run as "Latest run (final)" by itself.
@@ -173,9 +173,9 @@ def main() -> int:
     if msg:
         print(msg)
         return 0
-    from app.llm.client import AnthropicLLMClient
+    from app.llm.client import OpenRouterLLMClient
 
-    client = lc.Capped(AnthropicLLMClient.from_env(), config.GOLD_MAX_CALLS)
+    client = lc.Capped(OpenRouterLLMClient.from_env(), config.GOLD_MAX_CALLS)
     try:
         res = score(client, all_ds, report=print)
     except lc.RunAborted as e:

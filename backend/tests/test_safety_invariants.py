@@ -201,7 +201,7 @@ def test_fingerprints_differ_when_inputs_differ_so_mismatched_results_can_be_det
 
 # 9 ---- cannot leak sensitive data through explanations --------------------------------------------------------------------------------------------
 def test_an_explanation_that_quotes_the_prompt_or_a_key_never_reaches_the_user(api, monkeypatch):
-    monkeypatch.setenv("LLM_API_KEY", SECRET)
+    monkeypatch.setenv("OPENROUTER_API_KEY", SECRET)
     p, cur = plan()
     mock = MockLLM([None])
     sysprompt_probe = "You are the explanation writer"          # replaced below by the real system prompt once it is known

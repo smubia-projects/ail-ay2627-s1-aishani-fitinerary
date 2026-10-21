@@ -198,8 +198,8 @@ def main(argv: list[str]) -> int:
         print(msg)
         return 0
     label = sg.label_arg(argv)
-    from app.llm.client import AnthropicLLMClient
-    client = lc.Capped(AnthropicLLMClient.from_env(), config.GOLD_MAX_CALLS)
+    from app.llm.client import OpenRouterLLMClient
+    client = lc.Capped(OpenRouterLLMClient.from_env(), config.GOLD_MAX_CALLS)
     try:
         res = score_split(client, all_ds, prompts)
     except lc.RunAborted as e:
