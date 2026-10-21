@@ -12,10 +12,9 @@ from app.hardening.limiter import SlidingWindowLimiter, client_ip
 
 log = logging.getLogger("app.access")
 
-CHEAP = {"/health", "/data/summary", "/data/places", "/data/cities", "/check-itinerary", "/version"}
+CHEAP = {"/health", "/api/health", "/data/summary", "/data/places", "/data/cities", "/check-itinerary", "/version"}
 EXPENSIVE = {"/copilot", "/parse", "/parse-replan", "/parse-repair", "/parse-profile"}
 STANDARD = {"/optimise", "/compare-hotels", "/replan", "/evaluate-itinerary", "/explore", "/apply-repair"}
-EXPLAIN_ROUTES = {"/optimise", "/compare-hotels", "/replan"}
 KNOWN = CHEAP | EXPENSIVE | STANDARD
 
 SECURITY_HEADERS = [
@@ -143,8 +142,6 @@ class HardeningMiddleware:
                         return await limited_or(422, "invalid_number", "NaN and Infinity are not allowed.")
                     except (ValueError, RecursionError):
                         return await limited_or(422, "invalid_json", "Request body is not valid JSON.")
-                if path in EXPLAIN_ROUTES and isinstance(parsed, dict) and parsed.get("explain") is True:
-                    meta["tier"] = "expensive"
             ok, retry = self.limiter.check(ip, meta["tier"])
             if not ok:
                 meta["limited"] = True

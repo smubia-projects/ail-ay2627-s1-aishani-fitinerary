@@ -105,11 +105,12 @@ def test_tiers_are_independent(clients, clock):
     assert c.post("/optimise", json=optimise_body()).status_code == 200
 
 
-def test_explain_true_counts_against_the_expensive_tier(clients, clock):
+def test_explain_true_stays_on_the_standard_tier(clients, clock):
+    """The AI explanation is cost-controlled by the shared engine's 'explain' bucket (non-fatal, see test_ai_quota.py), so the
+    in-memory flood guard no longer moves explain=true requests to the expensive tier."""
     _, c = clients(rate_expensive_per_min=1, rate_standard_per_min=5)
     assert c.post("/optimise", json=optimise_body(explain=True)).status_code == 200
-    assert c.post("/optimise", json=optimise_body(explain=True)).status_code == 429
-    assert c.post("/optimise", json=optimise_body()).status_code == 200  # same route without explain: standard tier
+    assert c.post("/optimise", json=optimise_body(explain=True)).status_code == 200
 
 
 def test_different_ips_have_separate_buckets(clients, clock):
@@ -160,7 +161,7 @@ def test_window_resets_after_time_passes_without_sleeping(clients, clock):
 
 # ---- LLM circuit breaker ---------------------------------------------------------------------------------------------------
 def test_circuit_breaker_counts_retries_disables_the_llm_and_health_reflects_it(clients, clock, monkeypatch):
-    monkeypatch.setenv("LLM_API_KEY", KEY)
+    monkeypatch.setenv("OPENROUTER_API_KEY", KEY)
     monkeypatch.setenv("LLM_MODEL", "mock-model")
     mock = MockLLM(["bad", "bad", extraction(days=2)])
     _, c = clients(mock=mock, llm_daily_call_cap=3, rate_expensive_per_min=20, rate_standard_per_min=20)
@@ -422,7 +423,7 @@ def test_error_format_is_unified_including_404_and_405(clients):
 
 
 def test_fake_key_never_appears_in_responses_or_logs_across_a_fuzz_run(clients, clock, monkeypatch, caplog):
-    monkeypatch.setenv("LLM_API_KEY", KEY)
+    monkeypatch.setenv("OPENROUTER_API_KEY", KEY)
     monkeypatch.setenv("LLM_MODEL", "mock-model")
 
     class Leaky(MockLLM):
@@ -460,7 +461,7 @@ def test_log_redaction_unit():
 
 
 def test_unique_marker_never_reaches_the_logs_on_any_route(clients, clock, caplog, monkeypatch):
-    monkeypatch.setenv("LLM_API_KEY", KEY)
+    monkeypatch.setenv("OPENROUTER_API_KEY", KEY)
     monkeypatch.setenv("LLM_MODEL", "mock-model")
     MARK = "ZZMARKERZZ_8675309"
     mock = MockLLM([extraction(days=2, must_visit_names=[MARK]), extraction(days=2)] * 3 + ["text " + MARK] * 4)
@@ -526,16 +527,16 @@ def test_default_cors_is_localhost_dev_only():
 
 def test_wildcard_and_bad_origins_and_bad_config_are_refused_at_startup():
     with pytest.raises(ConfigError, match=r"\*"):
-        HConfig.from_env({"ALLOWED_ORIGINS": "*"})
+        HConfig.from_env({"CORS_ORIGINS": "*"})
     with pytest.raises(ConfigError):
         create_app(HConfig(allowed_origins=("https://ok.example", "*")))
     with pytest.raises(ConfigError, match="exact origin"):
-        HConfig.from_env({"ALLOWED_ORIGINS": "https://x.example/path"})
+        HConfig.from_env({"CORS_ORIGINS": "https://x.example/path"})
     for env in ({"RATE_LIMIT_PER_MIN": "0"}, {"RATE_LIMIT_PER_MIN": "abc"}, {"TRUSTED_PROXY_HOPS": "9"}, {"BODY_MAX_BYTES": "5"},
                {"RATE_LIMIT_EXPENSIVE_PER_MIN": "50", "RATE_LIMIT_PER_MIN": "10"}, {"LLM_DAILY_CALL_CAP": "-1"}):
         with pytest.raises(ConfigError):
             HConfig.from_env(env)
-    ok = HConfig.from_env({"ALLOWED_ORIGINS": "https://a.example, https://b.example/", "TRUSTED_PROXY_HOPS": "1"})
+    ok = HConfig.from_env({"CORS_ORIGINS": "https://a.example, https://b.example/", "TRUSTED_PROXY_HOPS": "1"})
     assert ok.allowed_origins == ("https://a.example", "https://b.example") and ok.trusted_proxy_hops == 1
 
 
@@ -547,7 +548,7 @@ def test_startup_fails_fast_on_missing_data_and_logs_a_secret_free_config_summar
     with pytest.raises(DataError):
         with TestClient(a):
             pass
-    monkeypatch.setenv("LLM_API_KEY", KEY)
+    monkeypatch.setenv("OPENROUTER_API_KEY", KEY)
     monkeypatch.setenv("LLM_MODEL", "some-model")
     with caplog.at_level(logging.INFO):
         with TestClient(create_app(HConfig())):
