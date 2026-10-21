@@ -13,9 +13,17 @@ describe('normaliseError', () => {
     const e = normaliseError({ status: 429, body: errBody('rate_limited', 'Too many requests.', { retry_after_seconds: 7.2 }) })
     expect([e.code, e.retryAfter]).toEqual(['rate_limited', 8])
   })
-  it('recognises solver capacity 503 responses without treating them as a host crash', () => {
-    const e = normaliseError({ status: 503, body: errBody('solver_busy', 'Solver busy.', { retry_after_seconds: 3 }) })
-    expect([e.code, e.status, e.retryAfter, e.message]).toEqual(['solver_busy', 503, 3, 'Solver busy.'])
+  it('recognises solver capacity 423 responses without treating them as a host crash', () => {
+    const e = normaliseError({ status: 423, body: errBody('solver_busy', 'Solver busy.', { retry_after_seconds: 3 }) })
+    expect([e.code, e.status, e.retryAfter, e.message]).toEqual(['solver_busy', 423, 3, 'Solver busy.'])
+  })
+  it('routes the shared rate-limit engine by code: 429 -> ai_quota_reached with detail.queries_used, 503 -> demo_paused', () => {
+    const q = normaliseError({ status: 429, body: { detail: { message: 'Rate limit exceeded.', queries_used: 5 }, ...errBody('ai_quota_reached', 'Used up.', { queries_used: 5 }) } })
+    expect([q.code, q.queriesUsed, q.retryAfter]).toEqual(['ai_quota_reached', 5, null])
+    expect(normaliseError({ status: 429, body: { detail: { message: 'Rate limit exceeded.', queries_used: 3 } } }).queriesUsed).toBe(3)
+    const p = normaliseError({ status: 503, body: { detail: { message: 'Paused for maintenance.' }, ...errBody('demo_paused', 'Paused for maintenance.') } })
+    expect([p.code, p.message]).toEqual(['demo_paused', 'Paused for maintenance.'])
+    expect(normaliseError({ status: 503, body: { detail: { message: 'Paused.' } } }).code).toBe('demo_paused')
   })
   it('falls back to a safe wait when a 429 has no usable body', () => {
     expect(normaliseError({ status: 429, body: null }).retryAfter).toBe(10)
