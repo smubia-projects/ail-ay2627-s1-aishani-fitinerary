@@ -4,7 +4,7 @@
 
 > **Data notice.** Four cities (Tokyo, Singapore, Seoul, Kuala Lumpur) of **sample data**: made-up demo hotels, estimated travel times and fares, not live prices, public holidays not modelled. Singapore: 7 fields source-checked, 0 rows human-verified, 75 unchecked; other cities unchecked; all data is still sample data. (Generated: `docs/data-verification/counts.md`.)
 
-[PLACEHOLDER: live app URL] · [PLACEHOLDER: backend URL] · [PLACEHOLDER: demo video link] · Source: https://github.com/Aish710/AI-lodge
+[PLACEHOLDER: live app URL] · [PLACEHOLDER: backend URL] · [PLACEHOLDER: demo video link] · Source: https://github.com/smubia-projects/ail-ay2627-s1-aishani-fitinerary (original: https://github.com/Aish710/AI-lodge)
 
 ## 1. Problem Statement
 
@@ -90,9 +90,9 @@ Around it: input sanitising, user text treated as data inside one delimited bloc
 
 ## 5. External Tools & Datasets
 
-- Backend: Python 3.13, FastAPI, Pydantic v2 (strict), OR-Tools CP-SAT, the `anthropic` SDK, pytest.
+- Backend: Python 3.13, FastAPI, Pydantic v2 (strict), OR-Tools CP-SAT, httpx (OpenRouter), upstash-redis (shared AI Lodge rate limiter), pytest.
 - Frontend: Vue 3, Vue Router, Vite, Bootstrap, Leaflet with OpenStreetMap tiles (a one-tile probe falls back to a plain background if the tile server refuses), Vitest, Playwright, Lighthouse.
-- **Model and gateway:** `claude-haiku-4-5-20251001` reached through the third-party gateway `api.apiyi.com` (set with `LLM_BASE_URL`). The gateway sees the cleaned request text and the computed facts (`docs/PRIVACY.md`). Without `LLM_BASE_URL` the backend calls the provider directly.
+- **Model and gateway:** all model calls go through OpenRouter (`https://openrouter.ai/api/v1`, OpenAI-compatible `/chat/completions`); the model is `LLM_MODEL` (default: the OpenRouter id for Claude Haiku, see `.env.example`). OpenRouter is a third-party gateway: it sees the cleaned request text and the computed facts (`docs/PRIVACY.md`). The live results in this README were produced with Claude Haiku 4.5 through an earlier gateway (`api.apiyi.com`); a different OpenRouter model needs the live scripts re-run.
 - **Data:** hand-built sample attractions and made-up hotels for four cities (`backend/app/data/cities/`), with a travel-time matrix estimated from straight-line distance (`backend/scripts/build_travel_matrix.py`). Every record is labelled `sample`. Singapore has per-field verification records (7 fields checked against official pages, with URL and date, in `docs/data-verification/singapore-findings.json`); nothing is human-verified. Three Singapore opening-hours values were corrected from official pages (`docs/data-verification/CHANGELOG.md`).
 - The AI-free evaluation method is in `docs/EVALUATION.md`.
 
@@ -114,7 +114,7 @@ printf 'VITE_API_BASE_URL=http://localhost:8000\n' > .env
 npm run dev                                       # http://localhost:5173
 ```
 
-To turn the AI on, copy `backend/.env.example` to `backend/.env` (it is gitignored; never commit it), set `LLM_API_KEY` and `LLM_MODEL` (and `LLM_BASE_URL` only for a gateway), and restart. Leave `LLM_EFFORT` unset.
+To turn the AI on, export `OPENROUTER_API_KEY` (and optionally `LLM_MODEL`) before starting uvicorn; every variable is documented in the root `.env.example` (copy it to `.env`, which is gitignored; never commit it).
 
 Checks:
 
@@ -127,7 +127,16 @@ cd backend && .venv/bin/python scripts/run_evaluation.py --full
 cd frontend && npm run verify:clean-clone             # clone, build and test from a clean checkout
 ```
 
-Opt-in live checks (each needs a key and spends model calls, capped): `RUN_LIVE_LLM_EVAL=1 .venv/bin/python scripts/ai_selfcheck.py`, `scripts/score_gold.py --live --label NAME`, `scripts/redteam_live.py`. Deployment (Render and Netlify), environment variables, smoke tests: `docs/DEPLOY.md`.
+Opt-in live checks (each needs a key and spends model calls, capped): `RUN_LIVE_LLM_EVAL=1 .venv/bin/python scripts/ai_selfcheck.py`, `scripts/score_gold.py --live --label NAME`, `scripts/redteam_live.py`.
+
+### Deployment (AI Lodge stack)
+
+- **Backend → Google Cloud Run** via `.github/workflows/deploy.yml`: on push to `main` it builds `backend/` (Docker build context), pushes `docker.io/<DOCKERHUB_USERNAME>/ail-ay2627-s1-aishani-fitinerary`, and deploys the Cloud Run service `ail-ay2627-s1-aishani-fitinerary` (asia-southeast3, 1 vCPU / 1 GiB, 0-2 instances). Env vars come from the repo's `DOTENV` secret: fill `.env` from `.env.example`, then `gh secret set DOTENV --repo smubia-projects/ail-ay2627-s1-aishani-fitinerary < .env` and `gh workflow run deploy.yml`. Health check: `GET /api/health` (alias of `/health`). The backend is API-only.
+- **Frontend → Vercel**: root directory `frontend`, framework Vite (`frontend/vercel.json`: `npm run build`, output `dist`, SPA rewrite, security headers + CSP). Set `VITE_API_BASE` to the Cloud Run URL. The CSP's `connect-src` allows `https://*.run.app`; if the API ever moves to another host, update `frontend/vercel.json`.
+- **CORS**: put the Vercel URL in `CORS_ORIGINS` (`.env` → re-upload `DOTENV` → re-run the workflow). `*` is refused at startup.
+- **AI quota**: the shared AI Lodge rate limiter (Upstash) caps model calls per IP per action bucket (`parse`, `repair`, `profile`, `replan`, `copilot`, `explain`). Over the limit, the AI routes answer 429 and the page shows the AI Lodge CTA; the plan explanations quietly fall back to the built-in template. A paused demo (kill switch) answers 503 `demo_paused`; a busy solver answers with its own non-503 status and the code `solver_busy`, and keeps its own retry notice.
+
+`docs/DEPLOY.md` describes the student's original Render + Netlify setup and is kept for history only.
 
 ## 7. AI Safety & Limitations
 

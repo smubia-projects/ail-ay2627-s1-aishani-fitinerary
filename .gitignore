@@ -224,3 +224,6 @@ __marimo__/
 # Node / frontend
 node_modules/
 dist-*/
+
+# Vercel CLI
+.vercel
