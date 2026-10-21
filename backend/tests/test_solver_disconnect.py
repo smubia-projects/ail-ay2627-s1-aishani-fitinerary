@@ -77,6 +77,6 @@ def test_busy_is_still_reported_while_another_request_is_connected(live):
     t.start()
     assert _wait_for(lambda: app.state.solver_capacity.active == 1, 5) is not None
     busy = httpx.post(base + "/optimise", json={"city_id": "tokyo", "hotel_id": "hotel_lantern_asakusa", "preferences": Preferences(days=1).model_dump()}, timeout=10)
-    assert busy.status_code == 503 and busy.json()["error"]["code"] == "solver_busy"
+    assert busy.status_code == 423 and busy.json()["error"]["code"] == "solver_busy"
     t.join(timeout=90)
     assert results["first"].status_code == 200

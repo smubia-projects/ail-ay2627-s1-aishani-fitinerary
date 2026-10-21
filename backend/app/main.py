@@ -66,6 +66,7 @@ def version_route():
 
 
 @router.get("/health")
+@router.get("/api/health")  # the AI Lodge standard health path (Cloud Run / Dockerfile HEALTHCHECK); same payload
 def health(request: Request):
     st = get_settings()  # never echoes the key
     limit = request.app.state.llm_budget.exhausted()

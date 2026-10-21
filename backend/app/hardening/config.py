@@ -46,7 +46,7 @@ class HConfig:
     @classmethod
     def from_env(cls, env=None) -> "HConfig":
         env = os.environ if env is None else env
-        origins_raw = env.get("ALLOWED_ORIGINS", "").strip()
+        origins_raw = env.get("CORS_ORIGINS", "").strip()
         origins = tuple(o.strip().rstrip("/") for o in origins_raw.split(",") if o.strip()) if origins_raw else DEFAULT_ORIGINS
         c = cls(
             body_max_bytes=_int(env, "BODY_MAX_BYTES", 64 * 1024, 1024, 5_000_000),
@@ -71,9 +71,9 @@ class HConfig:
     def validate(self) -> None:
         for o in self.allowed_origins:
             if "*" in o:
-                raise ConfigError("ALLOWED_ORIGINS must list exact origins; '*' is refused")
+                raise ConfigError("CORS_ORIGINS must list exact origins; '*' is refused")
             if not (o.startswith("http://") or o.startswith("https://")) or "/" in o.split("://", 1)[1]:
-                raise ConfigError(f"ALLOWED_ORIGINS entry '{o}' must be an exact origin like https://example.com (scheme + host, no path)")
+                raise ConfigError(f"CORS_ORIGINS entry '{o}' must be an exact origin like https://example.com (scheme + host, no path)")
         if self.rate_expensive_per_min > self.rate_standard_per_min:
             raise ConfigError("expensive-tier limit must not exceed the standard-tier limit")
 

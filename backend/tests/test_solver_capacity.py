@@ -18,7 +18,7 @@ def tiny():
     return Preferences(days=1, must_visit=["senso_ji", "tokyo_skytree"], start_weekday=2)
 
 
-def test_solver_busy_returns_structured_503_and_health_stays_responsive(monkeypatch):
+def test_solver_busy_returns_structured_423_and_health_stays_responsive(monkeypatch):
     entered = threading.Event()
     release = threading.Event()
 
@@ -43,7 +43,7 @@ def test_solver_busy_returns_structured_503_and_health_stays_responsive(monkeypa
         assert entered.wait(timeout=3)
 
         busy = client.post("/optimise", json=body)
-        assert busy.status_code == 503
+        assert busy.status_code == 423
         assert busy.headers["retry-after"] == "3"
         err = busy.json()["error"]
         assert err["code"] == "solver_busy"
