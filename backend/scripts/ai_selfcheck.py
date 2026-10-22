@@ -3,7 +3,7 @@
 For each city (Tokyo, Singapore, Seoul, Kuala Lumpur) it runs 5 checks through the SAME validation pipeline the API uses:
   1 typical request parsed        2 wrong-city destination stopped      3 ambiguous name flagged
   4 currency symbol read safely   5 explanation of a real computed result passes the grounding check
-Runs only with RUN_LIVE_LLM_EVAL=1 and OPENROUTER_API_KEY + LLM_MODEL (exported, or in backend/.env). Hard cap: config.SELFCHECK_MAX_CALLS.
+Runs only with RUN_LIVE_LLM_EVAL=1 and API_KEY + MODEL_NAME (exported, or in backend/.env). Hard cap: config.SELFCHECK_MAX_CALLS.
 Never prints the key or any prompt; prints PASS/FAIL per check with a short reason.
 Run from backend/:   RUN_LIVE_LLM_EVAL=1 .venv/bin/python scripts/ai_selfcheck.py
 Zero-call plan:      .venv/bin/python scripts/ai_selfcheck.py --plan

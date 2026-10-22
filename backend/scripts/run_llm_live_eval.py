@@ -1,6 +1,6 @@
 """OPT-IN live evaluation of the LLM layer against the real model, PER CITY. NOT part of pytest.
 
-Runs only if RUN_LIVE_LLM_EVAL=1 and OPENROUTER_API_KEY and LLM_MODEL are set. Hard cap on total model calls
+Runs only if RUN_LIVE_LLM_EVAL=1 and API_KEY and MODEL_NAME (or the old OPENROUTER_API_KEY and LLM_MODEL) are set. Hard cap on total model calls
 (config.LIVE_EVAL_MAX_CALLS = 150). Never prints the key or any text other than the fixtures.
 Run from backend/:  RUN_LIVE_LLM_EVAL=1 python scripts/run_llm_live_eval.py
 Dry plan (no model, no key, zero calls): python scripts/run_llm_live_eval.py --plan
@@ -48,8 +48,8 @@ def plan() -> int:
 if "--plan" in sys.argv:
     sys.exit(plan())
 
-if not (os.environ.get("RUN_LIVE_LLM_EVAL") == "1" and os.environ.get("OPENROUTER_API_KEY") and os.environ.get("LLM_MODEL")):
-    print("Live LLM evaluation is opt-in. Set RUN_LIVE_LLM_EVAL=1, OPENROUTER_API_KEY and LLM_MODEL to run it "
+if not (os.environ.get("RUN_LIVE_LLM_EVAL") == "1" and (os.environ.get("API_KEY") or os.environ.get("OPENROUTER_API_KEY")) and (os.environ.get("MODEL_NAME") or os.environ.get("LLM_MODEL"))):
+    print("Live LLM evaluation is opt-in. Set RUN_LIVE_LLM_EVAL=1, API_KEY and MODEL_NAME to run it "
           f"(at most {config.LIVE_EVAL_MAX_CALLS} model calls). Nothing was run.")
     sys.exit(0)
 

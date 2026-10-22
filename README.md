@@ -92,7 +92,7 @@ Around it: input sanitising, user text treated as data inside one delimited bloc
 
 - Backend: Python 3.13, FastAPI, Pydantic v2 (strict), OR-Tools CP-SAT, httpx (OpenRouter), upstash-redis (shared AI Lodge rate limiter), pytest.
 - Frontend: Vue 3, Vue Router, Vite, Bootstrap, Leaflet with OpenStreetMap tiles (a one-tile probe falls back to a plain background if the tile server refuses), Vitest, Playwright, Lighthouse.
-- **Model and gateway:** all model calls go through OpenRouter (`https://openrouter.ai/api/v1`, OpenAI-compatible `/chat/completions`); the model is `LLM_MODEL` (default: the OpenRouter id for Claude Haiku, see `.env.example`). OpenRouter is a third-party gateway: it sees the cleaned request text and the computed facts (`docs/PRIVACY.md`). The live results in this README were produced with Claude Haiku 4.5 through an earlier gateway (`api.apiyi.com`); a different OpenRouter model needs the live scripts re-run.
+- **Model and gateway:** all model calls go through OpenRouter (`https://openrouter.ai/api/v1`, OpenAI-compatible `/chat/completions`); the model is `MODEL_NAME` (default: the OpenRouter id for Claude Haiku, see `.env.example`). OpenRouter is a third-party gateway: it sees the cleaned request text and the computed facts (`docs/PRIVACY.md`). The live results in this README were produced with Claude Haiku 4.5 through an earlier gateway (`api.apiyi.com`); a different OpenRouter model needs the live scripts re-run.
 - **Data:** hand-built sample attractions and made-up hotels for four cities (`backend/app/data/cities/`), with a travel-time matrix estimated from straight-line distance (`backend/scripts/build_travel_matrix.py`). Every record is labelled `sample`. Singapore has per-field verification records (7 fields checked against official pages, with URL and date, in `docs/data-verification/singapore-findings.json`); nothing is human-verified. Three Singapore opening-hours values were corrected from official pages (`docs/data-verification/CHANGELOG.md`).
 - The AI-free evaluation method is in `docs/EVALUATION.md`.
 
@@ -114,7 +114,7 @@ printf 'VITE_API_BASE_URL=http://localhost:8000\n' > .env
 npm run dev                                       # http://localhost:5173
 ```
 
-To turn the AI on, export `OPENROUTER_API_KEY` (and optionally `LLM_MODEL`) before starting uvicorn; every variable is documented in the root `.env.example` (copy it to `.env`, which is gitignored; never commit it).
+To turn the AI on, export `API_KEY` (and optionally `MODEL_NAME`) before starting uvicorn; every variable is documented in the root `.env.example` (copy it to `.env`, which is gitignored; never commit it).
 
 Checks:
 

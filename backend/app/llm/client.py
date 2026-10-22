@@ -9,6 +9,7 @@ import logging
 import os
 import time
 from functools import lru_cache
+from urllib.parse import urlparse
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -16,8 +17,8 @@ from app import config
 
 log = logging.getLogger("app.llm")  # metadata only: never prompts, user text or keys
 
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-OPENROUTER_HOST = "openrouter.ai"
+OPENROUTER_BASE_URL = (os.environ.get("API_BASE_URL", "").strip() or os.environ.get("OPENROUTER_BASE_URL", "").strip() or "https://openrouter.ai/api/v1").rstrip("/")
+OPENROUTER_HOST = urlparse(OPENROUTER_BASE_URL).hostname or "openrouter.ai"
 
 
 class LLMUnavailable(Exception):
@@ -73,10 +74,10 @@ class OpenRouterLLMClient:
 
     @classmethod
     def from_env(cls) -> "OpenRouterLLMClient | None":
-        key = os.environ.get("OPENROUTER_API_KEY", "").strip()
+        key = (os.environ.get("API_KEY", "").strip() or os.environ.get("OPENROUTER_API_KEY", "")).strip()
         if not key:
             return None
-        return _cached_client(key, os.environ.get("LLM_MODEL", "").strip() or config.DEFAULT_LLM_MODEL)
+        return _cached_client(key, (os.environ.get("MODEL_NAME", "").strip() or os.environ.get("LLM_MODEL", "")).strip() or config.DEFAULT_LLM_MODEL)
 
     def complete(self, system: str, messages: list[dict], max_tokens: int) -> LLMResponse:
         import httpx

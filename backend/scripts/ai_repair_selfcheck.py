@@ -5,7 +5,7 @@ Four checks per city, through the SAME code path the API uses (app/llm/repair.py
   repair_keep     "Keep my hotel but remove optional sights before touching my must-visits" with the hotel kept -> no hotel switch, no must-visit given up, nothing applied
   style_slow      "I prefer a slow trip with lots of breaks" -> inferred settings only, every one needing confirmation, no invented number the user did not write
   style_budget    "I have a limited budget but <place> is essential" -> a question instead of an invented amount, the place proposed as a must-visit
-Runs only with RUN_LIVE_LLM_EVAL=1 and OPENROUTER_API_KEY + LLM_MODEL. Hard cap: config.REPAIR_SELFCHECK_MAX_CALLS. Never prints the key or any prompt. One run, a handful of checks: a smoke test, not a benchmark.
+Runs only with RUN_LIVE_LLM_EVAL=1 and API_KEY + MODEL_NAME. Hard cap: config.REPAIR_SELFCHECK_MAX_CALLS. Never prints the key or any prompt. One run, a handful of checks: a smoke test, not a benchmark.
 Run from backend/:   RUN_LIVE_LLM_EVAL=1 .venv/bin/python scripts/ai_repair_selfcheck.py        Writes ../docs/ai-repair-selfcheck.md (REPAIR_SELFCHECK_OUT_DIR overrides, used by tests with a MOCK client)."""
 import os
 import sys

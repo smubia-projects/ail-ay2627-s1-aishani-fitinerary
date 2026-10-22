@@ -15,8 +15,8 @@ from app.schemas import Preferences  # noqa: E402
 
 FATAL = {"authentication", "api_error"}  # no point spending more calls: the key or the model name is wrong
 ADVICE = {
-    "authentication": "The key was rejected by {host}. Check that OPENROUTER_API_KEY is a current key for that service (not a key for a different provider or gateway) and has no stray spaces or quotes.",
-    "api_error": "{host} returned an error. The most common cause is an invalid model name in LLM_MODEL (set to '{model}'): check the exact model ID your service offers. Model ids look like 'anthropic/claude-haiku-4.5' (see https://openrouter.ai/models).",
+    "authentication": "The key was rejected by {host}. Check that API_KEY is a current key for that service (not a key for a different provider or gateway) and has no stray spaces or quotes.",
+    "api_error": "{host} returned an error. The most common cause is an invalid model name in MODEL_NAME (set to '{model}'): check the exact model ID your service offers. Model ids look like 'anthropic/claude-haiku-4.5' (see https://openrouter.ai/models).",
     "network": "{host} could not be reached. Check your internet connection and any proxy or firewall settings.",
     "timeout": "The API did not answer in time.",
     "rate_limited": "The API rate-limited the request. Wait a minute and run again.",
@@ -73,11 +73,21 @@ def endpoint_stamp(client) -> str:
     return line
 
 
+# (name, old name): like the app (app/llm/client.py), the live scripts read the new name first and fall back to the old one.
+LIVE_VARS = (("API_KEY", "OPENROUTER_API_KEY"), ("MODEL_NAME", "LLM_MODEL"))
+
+
+def env_value(name: str) -> str:
+    """A LIVE_VARS value under its new or old name ('' when neither is set). Callers must never print the key."""
+    old = dict(LIVE_VARS)[name]
+    return (os.environ.get(name, "").strip() or os.environ.get(old, "")).strip()
+
+
 def gate(script: str, cap: int) -> str | None:
     """None when a live run may proceed, otherwise the plain message to print. Never echoes the key."""
     if os.environ.get("RUN_LIVE_LLM_EVAL") != "1":
-        return f"{script} is opt-in and made no model calls. To run it: RUN_LIVE_LLM_EVAL=1 plus OPENROUTER_API_KEY and LLM_MODEL (at most {cap} calls)."
-    missing = [v for v in ("OPENROUTER_API_KEY", "LLM_MODEL") if not os.environ.get(v)]
+        return f"{script} is opt-in and made no model calls. To run it: RUN_LIVE_LLM_EVAL=1 plus API_KEY and MODEL_NAME (at most {cap} calls)."
+    missing = [new for new, _ in LIVE_VARS if not env_value(new)]
     if missing:
         return (f"Cannot run live: {' and '.join(missing)} {'is' if len(missing) == 1 else 'are'} not set. Put {'it' if len(missing) == 1 else 'them'} in backend/.env (copy .env.example) "
                 f"or export them in this shell, then run again. Nothing was called.")

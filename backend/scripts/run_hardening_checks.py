@@ -14,7 +14,8 @@ sys.path.insert(0, str(ROOT / "tests"))
 
 import os  # noqa: E402
 
-os.environ.pop("OPENROUTER_API_KEY", None)
+for _var in ("API_KEY", "OPENROUTER_API_KEY", "MODEL_NAME", "LLM_MODEL"):
+    os.environ.pop(_var, None)
 FAKE_KEY = "sk-ant-FAKE-for-hardening-run-0123456789"
 
 from fastapi.testclient import TestClient  # noqa: E402
@@ -122,7 +123,7 @@ def main():
     record("429 carries Retry-After and unified error", "Retry-After header, error.code rate_limited", r.status_code == 429 and int(r.headers["retry-after"]) >= 1 and r.json()["error"]["code"] == "rate_limited", f"Retry-After {r.headers.get('retry-after')}")
 
     # leakage
-    os.environ["OPENROUTER_API_KEY"], os.environ["LLM_MODEL"] = FAKE_KEY, "fake-model"
+    os.environ["API_KEY"], os.environ["MODEL_NAME"] = FAKE_KEY, "fake-model"
     _, c4 = fresh(rate_cheap_per_min=10_000, rate_standard_per_min=10_000, rate_expensive_per_min=10_000)
     texts = []
     for path in ("/health", "/data/summary", "/nope"):
@@ -130,7 +131,7 @@ def main():
     for path in ("/parse", "/optimise", "/replan", "/compare-hotels", "/parse-replan"):
         for b in (b"", b"{}", b"\xff", b'{"text": 1}'):
             texts.append(c4.post(path, content=b, headers=J).text)
-    os.environ.pop("OPENROUTER_API_KEY"), os.environ.pop("LLM_MODEL")
+    os.environ.pop("API_KEY"), os.environ.pop("MODEL_NAME")
     record("Fake API key across 3 GET + 20 malformed POST responses", "key never in any response", not any(FAKE_KEY in t for t in texts), "not found in any response body")
 
     import app.main as m

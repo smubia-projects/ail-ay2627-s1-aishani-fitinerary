@@ -39,8 +39,8 @@ class Settings:
 
 def get_settings() -> Settings:
     return Settings(
-        llm_api_key=os.environ.get("OPENROUTER_API_KEY", "").strip(),
-        llm_model=os.environ.get("LLM_MODEL", "").strip() or DEFAULT_LLM_MODEL,
+        llm_api_key=(os.environ.get("API_KEY", "").strip() or os.environ.get("OPENROUTER_API_KEY", "")).strip(),
+        llm_model=(os.environ.get("MODEL_NAME", "").strip() or os.environ.get("LLM_MODEL", "")).strip() or DEFAULT_LLM_MODEL,
         max_input_chars=_int_env("MAX_INPUT_CHARS", 2000),
         rate_limit_per_min=_int_env("RATE_LIMIT_PER_MIN", 30),
     )

@@ -94,12 +94,12 @@ def test_a_rejected_key_aborts_after_the_first_call_with_actionable_advice():
     client = lc.Capped(RoutedMock("auth"), 40)
     with pytest.raises(lc.RunAborted) as e:
         sc.run_all(client, ALL, report=lambda *_: None)
-    assert client.total_calls == 1 and "OPENROUTER_API_KEY" in str(e.value)
+    assert client.total_calls == 1 and "API_KEY" in str(e.value)
 
 
 def test_a_bad_model_name_message_names_the_model_variable_not_the_key():
     msg = str(lc.RunAborted("api_error", "not-a-model"))
-    assert "LLM_MODEL" in msg and "not-a-model" in msg
+    assert "MODEL_NAME" in msg and "not-a-model" in msg
 
 
 def test_the_hard_cap_stops_the_run():
@@ -119,7 +119,7 @@ def test_report_has_model_prompt_version_git_hash_and_n_and_no_key(tmp_path):
 
 
 def _cli(*args, env=None):
-    base = {k: v for k, v in os.environ.items() if k not in ("RUN_LIVE_LLM_EVAL", "OPENROUTER_API_KEY", "LLM_MODEL")}
+    base = {k: v for k, v in os.environ.items() if k not in ("RUN_LIVE_LLM_EVAL", "API_KEY", "OPENROUTER_API_KEY", "MODEL_NAME", "LLM_MODEL")}
     return subprocess.run([sys.executable, str(BACKEND / "scripts" / "ai_selfcheck.py"), *args], capture_output=True, text=True, cwd=BACKEND,
                           env={**base, "LIVE_ENV_FILE": "/nonexistent", **(env or {})}, timeout=120)
 
@@ -131,9 +131,9 @@ def test_cli_without_opt_in_makes_no_calls_and_writes_nothing(tmp_path):
 
 def test_cli_opt_in_without_key_or_model_says_exactly_what_is_missing(tmp_path):
     r = _cli(env={"RUN_LIVE_LLM_EVAL": "1", "SELFCHECK_OUT_DIR": str(tmp_path)})
-    assert "OPENROUTER_API_KEY and LLM_MODEL are not set" in r.stdout and list(tmp_path.iterdir()) == []
+    assert "API_KEY and MODEL_NAME are not set" in r.stdout and list(tmp_path.iterdir()) == []
     r = _cli(env={"RUN_LIVE_LLM_EVAL": "1", "OPENROUTER_API_KEY": KEY, "SELFCHECK_OUT_DIR": str(tmp_path)})
-    assert "LLM_MODEL is not set" in r.stdout and KEY not in r.stdout + r.stderr
+    assert "MODEL_NAME is not set" in r.stdout and KEY not in r.stdout + r.stderr
 
 
 def test_cli_plan_is_zero_calls_and_fits_the_cap():

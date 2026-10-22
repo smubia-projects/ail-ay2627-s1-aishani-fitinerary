@@ -261,7 +261,7 @@ def plan_text():
     n = sum(1 for c in json.loads(CASES.read_text())["cases"] if c["ai_available"])
     return (f"Live run plan (nothing was run): {n} model calls (one per AI case, no retries), hard cap {LIVE_CALL_CAP}. Token envelope: about 400 input tokens per call (fixed classification prompt + the question) = {n * 400:,} "
             f"and about 40 output tokens per call = {n * 40:,}; planning envelope with margin: {n * 600:,} input / {n * 100:,} output. Estimated price = {n * 600 / 1e6:.3f} x (input price per million tokens) + {n * 100 / 1e6:.3f} x (output price per million tokens); "
-            "no provider price was assumed. Requires your explicit approval and RUN_LIVE_LLM_EVAL=1 plus OPENROUTER_API_KEY and LLM_MODEL.")
+            "no provider price was assumed. Requires your explicit approval and RUN_LIVE_LLM_EVAL=1 plus API_KEY and MODEL_NAME.")
 
 
 def main(argv=None):
