@@ -30,7 +30,7 @@ from app.hardening.disconnect import run_cancellable
 from app.optimiser.cost_summary import summarise_costs
 from app.hardening.solver_capacity import SolverCapacity
 from app.llm.client import OPENROUTER_HOST, LLMClient
-from app.rate_limit import check_rate_limit, explain_allowed
+from app.rate_limit import check_rate_limit
 from app.llm.explain import OptimiseView, explain
 from app.llm.extract import extract_preferences
 from app.llm.parse_replan import parse_replan
@@ -304,18 +304,16 @@ def _optimise_work(req: OptimiseRequest, request: Request, client, ds, cfg):
 NO_VALID_PLAN_NOTE = "No model-written text is used when there is no valid plan: this explanation is written by code from the validator's result."
 
 
-EXPLAIN_QUOTA_NOTE = "The AI explanation limit for this demo has been reached, so this explanation is written by code from the computed result."
-
-
 def _explain_args(client, request: Request, ok: bool):
     """The model may only word an explanation of a VALID result. For a plan that does not exist (infeasible, rejected by the validator, nothing applied) the model is not asked at all:
     otherwise its prose could say "this plan is valid" next to a failing report. The decision is made here, in code, outside the model's reach.
-    The shared AI quota ('explain' bucket) is checked only when the model would actually be asked, and it is NON-FATAL: over the limit (or
-    with the demo paused) the built-in template explanation is used and the plan is still returned."""
+    The shared AI quota ('explain' bucket) is checked only when the model would actually be asked; like every other AI route, over the
+    limit it raises 429 (the frontend opens the AI Lodge CTA) and with the demo paused 503. The explanation is a separate opt-in request,
+    so the plan already on screen is unaffected."""
     if not ok:
         return None, NO_VALID_PLAN_NOTE
-    if client is not None and not explain_allowed(request):
-        return None, EXPLAIN_QUOTA_NOTE
+    if client is not None:
+        check_rate_limit(request, "explain")
     return client, request.state.llm_note
 
 

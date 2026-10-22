@@ -106,7 +106,7 @@ def test_tiers_are_independent(clients, clock):
 
 
 def test_explain_true_stays_on_the_standard_tier(clients, clock):
-    """The AI explanation is cost-controlled by the shared engine's 'explain' bucket (non-fatal, see test_ai_quota.py), so the
+    """The AI explanation is cost-controlled by the shared engine's 'explain' bucket (429 at the limit, see test_ai_quota.py), so the
     in-memory flood guard no longer moves explain=true requests to the expensive tier."""
     _, c = clients(rate_expensive_per_min=1, rate_standard_per_min=5)
     assert c.post("/optimise", json=optimise_body(explain=True)).status_code == 200

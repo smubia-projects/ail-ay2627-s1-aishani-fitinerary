@@ -1,9 +1,8 @@
 """The shared AI Lodge rate-limit engine wired into this API (app/rate_limit.py): which routes count, the 429/503 response
-contract the frontend routes on, and the NON-FATAL explanation bucket. The engine's Redis calls are replaced by a fake limiter."""
+contract the frontend routes on, including the opt-in explanation bucket. The engine's Redis calls are replaced by a fake limiter."""
 import pytest
 from fastapi.testclient import TestClient
 
-import app.main as main_mod
 from app import rate_limit
 from app.data.loader import load_dataset
 from app.llm.client import get_llm_client
@@ -75,13 +74,20 @@ def test_sample_mode_never_counts_against_the_quota(setup):
     assert fake.hits == []
 
 
-def test_explanation_over_the_limit_falls_back_to_the_template_and_the_plan_is_kept(setup):
+def test_explanation_over_the_limit_returns_429_like_every_other_ai_route(setup):
     mock = MockLLM(["This should never be used."])
     fake = setup("limited", mock)
     with TestClient(app) as c:
         r = c.post("/optimise", json={"preferences": prefs(), "hotel_id": ASA, "explain": True})
-    assert r.status_code == 200 and r.json()["result"]["status"] == "feasible"
-    assert r.json()["explanation"]["source"] == "template" and fake.hits == ["explain"] and mock.calls == []
+    assert r.status_code == 429 and r.json()["error"]["code"] == "ai_quota_reached" and r.json()["detail"]["queries_used"] == 5
+    assert fake.hits == ["explain"] and mock.calls == []
+
+
+def test_explanation_with_the_demo_paused_returns_503(setup):
+    setup("killed", MockLLM(["This should never be used."]))
+    with TestClient(app) as c:
+        r = c.post("/optimise", json={"preferences": prefs(), "hotel_id": ASA, "explain": True})
+    assert r.status_code == 503 and r.json()["error"]["code"] == "demo_paused"
 
 
 def test_explanation_under_the_limit_may_use_the_model_and_solver_routes_are_not_counted_without_explain(setup):
@@ -98,4 +104,3 @@ def test_api_health_alias_and_solver_busy_is_not_503():
         assert c.get("/api/health").json()["status"] == "ok"
     from app.hardening.solver_capacity import SOLVER_BUSY_STATUS
     assert SOLVER_BUSY_STATUS != 503
-    assert main_mod.EXPLAIN_QUOTA_NOTE
