@@ -10,9 +10,9 @@ const PROJECT_CONFIG = {
   headline: 'Your trip is taking shape!',
   description: "You've used all {count} free AI requests in this demo. The planner itself still works: compare hotels, optimise and edit your itinerary as much as you like. In SMUBIA's AI Lodge, you can learn to build AI apps like this from scratch.",
   programme: 'AI Lodge',
-  programmeLink: 'https://www.smubia.com/ai-lodge',
+  programmeLink: 'https://www.smubia.com/ailodge',
   githubLink: 'https://github.com/smubia-projects/ail-ay2627-s1-aishani-fitinerary',
-  showcaseLink: 'https://www.smubia.com/showcase',
+  showcaseLink: 'https://www.smubia.com/Projects',
 }
 
 const props = defineProps({ queriesMade: { type: Number, default: null } })
@@ -79,11 +79,11 @@ onBeforeUnmount(() => {
         <a :href="PROJECT_CONFIG.programmeLink" target="_blank" rel="noopener noreferrer" class="rl-btn rl-btn-primary" :style="primaryStyle">
           Join {{ PROJECT_CONFIG.programme }}<span class="rl-arrow" aria-hidden="true">→</span>
         </a>
-        <a :href="PROJECT_CONFIG.githubLink" target="_blank" rel="noopener noreferrer" class="rl-btn rl-btn-secondary">
-          Self-host from GitHub<span class="rl-arrow" aria-hidden="true">→</span>
-        </a>
         <a :href="PROJECT_CONFIG.showcaseLink" target="_blank" rel="noopener noreferrer" class="rl-btn rl-btn-secondary">
           Explore other projects<span class="rl-arrow" aria-hidden="true">→</span>
+        </a>
+        <a :href="PROJECT_CONFIG.githubLink" target="_blank" rel="noopener noreferrer" class="rl-btn rl-btn-secondary">
+          View on GitHub<span class="rl-arrow" aria-hidden="true">→</span>
         </a>
         <button type="button" class="rl-later" @click="emit('dismiss')" data-testid="rate-limit-cta-dismiss">Maybe later</button>
       </div>
