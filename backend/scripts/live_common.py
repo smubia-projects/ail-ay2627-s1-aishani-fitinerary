@@ -16,7 +16,7 @@ from app.schemas import Preferences  # noqa: E402
 FATAL = {"authentication", "api_error"}  # no point spending more calls: the key or the model name is wrong
 ADVICE = {
     "authentication": "The key was rejected by {host}. Check that API_KEY is a current key for that service (not a key for a different provider or gateway) and has no stray spaces or quotes.",
-    "api_error": "{host} returned an error. The most common cause is an invalid model name in MODEL_NAME (set to '{model}'): check the exact model ID your service offers. Model ids look like 'anthropic/claude-haiku-4.5' (see https://openrouter.ai/models).",
+    "api_error": "{host} returned an error. The most common cause is an invalid model name in MODEL_NAME (set to '{model}'): check the exact model ID your service offers. Model ids look like 'claude-haiku-4-5-20251001' (the gateway's /models endpoint lists the IDs your key may use).",
     "network": "{host} could not be reached. Check your internet connection and any proxy or firewall settings.",
     "timeout": "The API did not answer in time.",
     "rate_limited": "The API rate-limited the request. Wait a minute and run again.",

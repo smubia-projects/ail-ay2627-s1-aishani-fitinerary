@@ -1,6 +1,6 @@
 """LLM client: one-method Protocol, an OpenRouter implementation, and a safe error type.
 
-All model calls go through OpenRouter's OpenAI-compatible /chat/completions endpoint (https://openrouter.ai/api/v1).
+All model calls go through apiyi's OpenAI-compatible /chat/completions endpoint (https://api.apiyi.com/v1).
 No tools, no web access, no streaming, no automatic retries, so the per-request call caps in config.py are exact.
 Any failure raises LLMUnavailable with a safe message; callers fall back to sample mode.
 The API key is never put in messages, logs or repr().
@@ -17,7 +17,7 @@ from app import config
 
 log = logging.getLogger("app.llm")  # metadata only: never prompts, user text or keys
 
-OPENROUTER_BASE_URL = (os.environ.get("API_BASE_URL", "").strip() or os.environ.get("OPENROUTER_BASE_URL", "").strip() or "https://openrouter.ai/api/v1").rstrip("/")
+OPENROUTER_BASE_URL = (os.environ.get("API_BASE_URL", "").strip() or os.environ.get("OPENROUTER_BASE_URL", "").strip() or "https://api.apiyi.com/v1").rstrip("/")
 OPENROUTER_HOST = urlparse(OPENROUTER_BASE_URL).hostname or "openrouter.ai"
 
 
