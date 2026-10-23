@@ -138,7 +138,7 @@ def test_openrouter_client_sends_no_tools_no_sampling_params_and_caps_tokens():
 
     resp = _or_client(handler).complete("SYS", [{"role": "user", "content": "hi"}], 321)
     body = seen["body"]
-    assert seen["url"] == "https://openrouter.ai/api/v1/chat/completions" and seen["auth"] == f"Bearer {KEY}"
+    assert seen["url"] == "https://api.apiyi.com/v1/chat/completions" and seen["auth"] == f"Bearer {KEY}"
     assert set(body) == {"model", "max_tokens", "messages"} and body["max_tokens"] == 321 and body["model"] == "model-x"
     assert body["messages"] == [{"role": "system", "content": "SYS"}, {"role": "user", "content": "hi"}]
     assert resp.text == '{"ok": 1}' and resp.input_tokens == 7 and resp.output_tokens == 3 and resp.stop_reason == "stop"
@@ -172,8 +172,8 @@ def test_from_env_needs_the_key_and_defaults_the_model(monkeypatch):
     assert OpenRouterLLMClient.from_env() is None
     monkeypatch.setenv("OPENROUTER_API_KEY", KEY)
     assert OpenRouterLLMClient.from_env().model == config.DEFAULT_LLM_MODEL
-    monkeypatch.setenv("LLM_MODEL", "google/gemini-2.5-flash")
-    assert OpenRouterLLMClient.from_env().model == "google/gemini-2.5-flash"
+    monkeypatch.setenv("LLM_MODEL", "gemini-3.5-flash-lite")
+    assert OpenRouterLLMClient.from_env().model == "gemini-3.5-flash-lite"
 
 
 # ---- logging and persistence -----------------------------------------------------------------------------------------------------
