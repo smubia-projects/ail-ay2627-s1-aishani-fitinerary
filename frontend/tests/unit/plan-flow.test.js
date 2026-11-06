@@ -96,10 +96,10 @@ describe('the last good result survives every failure', () => {
     return { plan: store.plan, comparison: store.comparison, hotel: store.chosenHotel }
   }
 
-  it('503 solver_busy: plan and comparison stay, a countdown starts, and NOTHING is retried automatically', async () => {
+  it('423 solver_busy: plan and comparison stay, a countdown starts, and NOTHING is retried automatically', async () => {
     const good = await withGoodPlan()
     vi.useFakeTimers()
-    const { fn, state } = scripted({ '/compare-hotels': async () => res(503, errBody('solver_busy', 'busy', { retry_after_seconds: 7 }), { 'retry-after': '7' }), '/optimise': ok(feasible) })
+    const { fn, state } = scripted({ '/compare-hotels': async () => res(423, errBody('solver_busy', 'busy', { retry_after_seconds: 7 }), { 'retry-after': '7' }), '/optimise': ok(feasible) })
     vi.stubGlobal('fetch', fn)
     expect(await planMyTrip()).toBe(false)
     expect(store.comparisonError.code).toBe('solver_busy')
@@ -112,9 +112,9 @@ describe('the last good result survives every failure', () => {
     expect(solverBusySeconds.value).toBe(0)
   })
 
-  it('503 on the planning step AFTER a successful comparison: the previous plan, hotel and comparison are all untouched', async () => {
+  it('423 on the planning step AFTER a successful comparison: the previous plan, hotel and comparison are all untouched', async () => {
     const good = await withGoodPlan()
-    const { fn } = scripted({ '/compare-hotels': ok({ ...compare, best_by_true_cost: HOTELS[2] }), '/optimise': async () => res(503, errBody('solver_busy', 'busy', { retry_after_seconds: 4 }), { 'retry-after': '4' }) })
+    const { fn } = scripted({ '/compare-hotels': ok({ ...compare, best_by_true_cost: HOTELS[2] }), '/optimise': async () => res(423, errBody('solver_busy', 'busy', { retry_after_seconds: 4 }), { 'retry-after': '4' }) })
     vi.stubGlobal('fetch', fn)
     expect(await planMyTrip()).toBe(false)
     expect(store.planError.code).toBe('solver_busy')
@@ -124,10 +124,10 @@ describe('the last good result survives every failure', () => {
     expect(store.stage).toBeNull()
   })
 
-  it('503 while switching hotel: the old hotel and plan stay selected; the retry is manual and works', async () => {
+  it('423 while switching hotel: the old hotel and plan stay selected; the retry is manual and works', async () => {
     const good = await withGoodPlan()
     let n = 0
-    const { fn } = scripted({ '/optimise': async () => (++n === 1 ? res(503, errBody('solver_busy', 'busy', { retry_after_seconds: 3 }), { 'retry-after': '3' }) : res(200, { city_id: 'tokyo', ...planFor(HOTELS[2]) })) })
+    const { fn } = scripted({ '/optimise': async () => (++n === 1 ? res(423, errBody('solver_busy', 'busy', { retry_after_seconds: 3 }), { 'retry-after': '3' }) : res(200, { city_id: 'tokyo', ...planFor(HOTELS[2]) })) })
     vi.stubGlobal('fetch', fn)
     await switchHotel(HOTELS[2])
     expect(store.planError.code).toBe('solver_busy')

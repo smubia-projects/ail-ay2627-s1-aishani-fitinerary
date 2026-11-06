@@ -75,7 +75,7 @@ test('Cancel stops planning and the page stays on Plan with everything preserved
   await expect(page.getByTestId('plan-trip')).toBeEnabled()
 })
 
-test('solver busy (503): friendly message, countdown, manual Retry only, nothing retried by itself, the last plan is kept', async ({ page }) => {
+test('solver busy (423): friendly message, countdown, manual Retry only, nothing retried by itself, the last plan is kept', async ({ page }) => {
   await page.goto('/')
   await planFromExample(page)
   await allDays(page)
@@ -83,7 +83,7 @@ test('solver busy (503): friendly message, countdown, manual Retry only, nothing
   await expect(page.getByTestId('timeline')).toBeVisible()
   await page.getByTestId('edit-trip').click()
   let calls = 0
-  await page.route('**/compare-hotels', (r) => { calls += 1; return r.fulfill({ status: 503, contentType: 'application/json', headers: { 'retry-after': '3' },
+  await page.route('**/compare-hotels', (r) => { calls += 1; return r.fulfill({ status: 423, contentType: 'application/json', headers: { 'retry-after': '3' },
     body: JSON.stringify({ error: { code: 'solver_busy', message: 'busy', details: { retry_after_seconds: 3, active_solves: 1, capacity: 1 }, request_id: 'rb' } }) }) })
   await page.getByTestId('plan-trip').click()
   const busy = page.getByTestId('solver-busy')

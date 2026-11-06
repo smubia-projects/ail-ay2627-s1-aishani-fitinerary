@@ -67,7 +67,7 @@ class OpenRouterLLMClient:
         self._client = httpx.Client(
             base_url=OPENROUTER_BASE_URL, timeout=timeout, transport=transport,
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
-                     "HTTP-Referer": "https://www.smubia.com/ai-lodge", "X-Title": "Fitinerary"})
+                     "HTTP-Referer": "https://www.smubia.com/ailodge", "X-Title": "Fitinerary"})
 
     def __repr__(self) -> str:  # never expose the key
         return f"OpenRouterLLMClient(model={self.model!r}, endpoint={self.endpoint_host!r}, api_key='***')"

@@ -7,7 +7,7 @@ import { buildScenario, draftFrom, validationOf } from './lib/whatif.js'
 import { applyAiSettings, applyProfile, clearOverrides, emptyProfile, syncOverrides } from './lib/profiles.js'
 import { reactive, computed } from 'vue'
 import * as api from './api/routes.js'
-import { abortKey, ApiError, isAborted, setCityProvider, setRateLimitHandler, waitForServer } from './api/client.js'
+import { abortKey, ApiError, isAborted, setCityProvider, setPausedHandler, setQuotaHandler, setRateLimitHandler, waitForServer } from './api/client.js'
 import { cleanHotelText, clearedOnCitySwitch } from './lib/names.js'
 import { setSupportedCurrencies } from './lib/format.js'
 import { applyPatch, buildPreferences, DEFAULT_FORM, formFromDraft, formFromPrefs } from './lib/prefs.js'
@@ -43,6 +43,8 @@ export const store = reactive({
   parseResult: null, parseError: null, proposal: null, proposalError: null,
   explanations: { optimise: null, compare: null, replan: null }, explainError: null, explaining: null,
   rateLimitUntil: 0, now: Date.now(),
+  quotaCta: { open: false, count: null },     // AI Lodge Rate-Limit CTA modal (429 ai_quota_reached from the shared engine)
+  demoPaused: { open: false, message: '' },   // "demo paused" notice (503 demo_paused from the kill switch); never the CTA
   theme: 'all',                  // the chosen theme tab on the Plan screen (UI only)
   interestThemes: [], parsedInterests: [],   // interests that only HIGHLIGHT sights (UI only; the planner uses Must / Include / Skip)
   selectedDay: 1,            // the day chip on Your trip: 'all' or a day number (UI only)
@@ -69,11 +71,16 @@ setRateLimitHandler((seconds) => {
   store.rateLimitUntil = Date.now() + seconds * 1000
   startClock()
 })
+// The AI quota (shared rate-limit engine) and the kill switch: modals only. They do not pause the deterministic planner.
+setQuotaHandler((count) => { store.quotaCta = { open: true, count } })
+setPausedHandler((message) => { store.demoPaused = { open: true, message } })
+export function dismissQuotaCta() { store.quotaCta = { ...store.quotaCta, open: false } }
+export function dismissDemoPaused() { store.demoPaused = { ...store.demoPaused, open: false } }
 export const rateLimited = computed(() => store.rateLimitUntil > store.now)
 export const rateLimitSeconds = computed(() => Math.max(0, Math.ceil((store.rateLimitUntil - store.now) / 1000)))
 export const solverBusyActive = computed(() => store.solverBusyUntil > store.now)
 export const solverBusySeconds = computed(() => Math.max(0, Math.ceil((store.solverBusyUntil - store.now) / 1000)))
-/** The server's single solver slot is taken (503 solver_busy): remember until when, so the screen can count down. Nothing is retried automatically. */
+/** The server's single solver slot is taken (423 solver_busy): remember until when, so the screen can count down. Nothing is retried automatically. */
 export function noteSolverBusy(err) {
   if (err?.code !== 'solver_busy') return
   store.solverBusyUntil = Date.now() + (err.retryAfter ?? err.details?.retry_after_seconds ?? 5) * 1000

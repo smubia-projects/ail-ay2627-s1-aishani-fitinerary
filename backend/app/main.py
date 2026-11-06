@@ -6,6 +6,8 @@ from collections import Counter
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, Depends, FastAPI, Query, Request
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
@@ -17,7 +19,7 @@ from app.money import missed_preference_penalty, empty_day_penalty, spread_penal
 from app.config import FX_LABEL, SAMPLE_FX_JPY_PER_SGD, get_settings
 from app.data.loader import DEFAULT_CITY_ID, Dataset, load_all_city_datasets, load_dataset
 from app.hardening.config import HConfig
-from app.hardening.errors import ApiError, error_response
+from app.hardening.errors import ApiError, error_body, error_response
 from app.hardening.limiter import SlidingWindowLimiter
 from app.hardening.llm_scope import LLMBudget, llm_for_request
 from app.hardening.logging_setup import configure_logging
@@ -28,6 +30,7 @@ from app.hardening.disconnect import run_cancellable
 from app.optimiser.cost_summary import summarise_costs
 from app.hardening.solver_capacity import SolverCapacity
 from app.llm.client import OPENROUTER_HOST, LLMClient
+from app.rate_limit import check_rate_limit
 from app.llm.explain import OptimiseView, explain
 from app.llm.extract import extract_preferences
 from app.llm.parse_replan import parse_replan
@@ -303,8 +306,15 @@ NO_VALID_PLAN_NOTE = "No model-written text is used when there is no valid plan:
 
 def _explain_args(client, request: Request, ok: bool):
     """The model may only word an explanation of a VALID result. For a plan that does not exist (infeasible, rejected by the validator, nothing applied) the model is not asked at all:
-    otherwise its prose could say "this plan is valid" next to a failing report. The decision is made here, in code, outside the model's reach."""
-    return (client, request.state.llm_note) if ok else (None, NO_VALID_PLAN_NOTE)
+    otherwise its prose could say "this plan is valid" next to a failing report. The decision is made here, in code, outside the model's reach.
+    The shared AI quota ('explain' bucket) is checked only when the model would actually be asked; like every other AI route, over the
+    limit it raises 429 (the frontend opens the AI Lodge CTA) and with the demo paused 503. The explanation is a separate opt-in request,
+    so the plan already on screen is unaffected."""
+    if not ok:
+        return None, NO_VALID_PLAN_NOTE
+    if client is not None:
+        check_rate_limit(request, "explain")
+    return client, request.state.llm_note
 
 
 class EvaluateItineraryRequest(_Req):
@@ -382,6 +392,8 @@ class ParseRequest(_Req):
 @router.post("/parse")
 def parse_route(req: ParseRequest, request: Request, client: LLMClient | None = Depends(llm_for_request)):
     """Free text -> Preferences DRAFT (a proposal). In sample mode returns status llm_unavailable (HTTP 200, never a 500)."""
+    if client is not None:
+        check_rate_limit(request, "parse")
     r = extract_preferences(req.text, _dataset(request, req.city_id), client, start_weekday=req.start_weekday,
                             all_datasets=request.app.state.datasets,
                             unavailable_note=request.state.llm_note)
@@ -403,6 +415,8 @@ def parse_repair_route(req: ParseRepairRequest, request: Request, client: LLMCli
     _check_city_ids(request, ds, hotels=[req.hotel_id], prefs=req.preferences)
     if req.hotel_id not in ds.hotels:
         raise ApiError(422, "unknown_hotel", "Unknown hotel id.")
+    if client is not None:
+        check_rate_limit(request, "repair")
     out = parse_repair(req.text, req.preferences, req.hotel_id, req.keep_hotel, ds, client, unavailable_note=request.state.llm_note,
                        solve_seconds=cfg.optimise_time_limit_seconds, solve_slot=request.app.state.solver_capacity.claim).model_dump()
     return {**out, "city_id": ds.city.id}
@@ -465,6 +479,8 @@ class ParseProfileRequest(_Req):
 def parse_profile_route(req: ParseProfileRequest, request: Request, client: LLMClient | None = Depends(llm_for_request)):
     """Free text -> PROPOSED travel-style settings, each labelled explicit or inferred. Nothing is applied or solved."""
     ds = _dataset(request, req.city_id)
+    if client is not None:
+        check_rate_limit(request, "profile")
     cur = {k: v for k, v in req.current.items() if k in ("pace", "maxActivities", "maxDailyTravel", "valueOfTime", "budget") and isinstance(v, (str, int, bool, type(None)))}
     out = parse_profile(req.text, cur, [u for u in req.user_overrides if u in ("pace", "maxActivities", "maxDailyTravel", "valueOfTime", "budget")], ds, client, unavailable_note=request.state.llm_note).model_dump()
     return {**out, "city_id": ds.city.id}
@@ -484,6 +500,8 @@ def parse_replan_route(req: ParseReplanRequest, request: Request, client: LLMCli
     _check_city_ids(request, ds, prefs=req.preferences, part="early")
     current = rebuild_client_schedule(req.preferences, req.current_result, ds, request.app.state.datasets,
                                       after_structure=lambda: _check_city_ids(request, ds, prefs=req.preferences, part="late"))
+    if client is not None:
+        check_rate_limit(request, "replan")
     out = parse_replan(req.text, current, req.preferences, ds, client, unavailable_note=request.state.llm_note,
                        all_datasets=request.app.state.datasets).model_dump()
     return {**out, "city_id": ds.city.id}
@@ -506,6 +524,8 @@ async def copilot_route(req: CopilotRequest, request: Request, client: LLMClient
         raise ApiError(422, "unknown_hotel", "Unknown hotel id.")
     if req.fingerprint != plan_fingerprint(req.preferences, req.current_result.hotel_id, ds):
         raise ApiError(409, "stale_scenario", "This question refers to an older scenario. Ask again on the current plan.")
+    if client is not None and not req.operation:  # an explicit quick question is answered by code alone: no model call, no quota used
+        await run_in_threadpool(check_rate_limit, request, "copilot")
 
     def work():
         # Client prose, conflicts, prices, totals and validity assertions are never evidence.
@@ -586,6 +606,15 @@ def create_app(cfg: HConfig | None = None, data_loader=load_all_city_datasets) -
 
     @app.exception_handler(StarletteHTTPException)
     async def _http(request: Request, exc: StarletteHTTPException):
+        if exc.status_code in (429, 503) and isinstance(exc.detail, dict):
+            # The shared rate-limit engine (app/rate_limit_engine.py). Keep its contract ({"detail": {...}}, read by the AI Lodge CTA:
+            # detail.queries_used) AND this API's unified {"error": {...}} format, with a code the frontend routes on.
+            if exc.status_code == 429:
+                err = error_body("ai_quota_reached", "You have used all the free AI requests for this demo. The planner itself (hotel comparison, "
+                                 "optimiser, every edit button) still works.", {"queries_used": exc.detail.get("queries_used")}, rid(request))
+            else:
+                err = error_body("demo_paused", str(exc.detail.get("message") or "This demo is temporarily paused."), None, rid(request))
+            return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail, **err})
         code = {404: "not_found", 405: "method_not_allowed"}.get(exc.status_code, "http_error")
         return error_response(exc.status_code, code, "Not found." if exc.status_code == 404 else "Request cannot be handled.", None, rid(request))
 

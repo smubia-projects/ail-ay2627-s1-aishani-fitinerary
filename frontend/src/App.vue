@@ -5,9 +5,11 @@ import ModeIndicator from './components/ModeIndicator.vue'
 import CityChip from './components/CityChip.vue'
 import ServerStatus from './components/ServerStatus.vue'
 import RateLimitNotice from './components/RateLimitNotice.vue'
+import RateLimitCTA from './components/RateLimitCTA.vue'
+import PausedNotice from './components/PausedNotice.vue'
 import { useRouter } from 'vue-router'
 import ConfirmDialog from './components/ConfirmDialog.vue'
-import { boot, store, resetAll, selectCity } from './store.js'
+import { boot, store, resetAll, selectCity, dismissQuotaCta, dismissDemoPaused } from './store.js'
 import { clearedOnCitySwitch } from './lib/names.js'
 import { hasUnsavedWork } from './lib/tripSummary.js'
 import { PROJECT_NAME, REPO_URL } from './brand.js'
@@ -63,6 +65,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
     <p class="mb-2">One trip covers one city, so switching to {{ pendingName }} will clear:</p>
     <ul class="mb-0" data-testid="switch-clears"><li v-for="item in clearedOnCitySwitch(store)" :key="item">{{ item }}</li></ul>
   </ConfirmDialog>
+  <RateLimitCTA v-if="store.quotaCta.open" :queries-made="store.quotaCta.count" @dismiss="dismissQuotaCta" />
+  <PausedNotice v-if="store.demoPaused.open" :open="true" :message="store.demoPaused.message" @dismiss="dismissDemoPaused" />
   <footer class="page site-footer" data-testid="footer">
     <p class="mb-1"><strong>Privacy:</strong> nothing is stored; no cookies or analytics. Map tiles come from OpenStreetMap. <router-link to="/how-it-works#privacy">Details</router-link></p>
     <p class="mb-0">{{ PROJECT_NAME }} · <router-link to="/proof">Proof</router-link> · <a :href="REPO_URL" target="_blank" rel="noopener noreferrer">Source</a> ·

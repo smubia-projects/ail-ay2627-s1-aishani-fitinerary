@@ -1,5 +1,5 @@
 <script setup>
-// Friendly message for 503 solver_busy: the server solves one plan at a time. A countdown, then a MANUAL Retry button. Nothing is retried automatically.
+// Friendly message for 423 solver_busy: the server solves one plan at a time. A countdown, then a MANUAL Retry button. Nothing is retried automatically.
 import { computed } from 'vue'
 import { solverBusyActive, solverBusySeconds, store } from '../store.js'
 const props = defineProps({ error: { type: Object, default: null } })

@@ -3,15 +3,17 @@
 //  * abort-by-key so a stale response can never overwrite a newer one
 //  * timeouts LONGER than the server's 25 s request deadline (so the server's own answer wins)
 //  * retry ONLY for the cold-start /health probe. POSTs are never retried (a retry could double-spend LLM calls)
-//  * HTTP 429: the Retry-After value is read from the error body (the browser cannot read the header cross-origin: CORS does not expose it)
+//  * HTTP 429 is routed by error code: 'ai_quota_reached' (the shared AI Lodge rate-limit engine) opens the Rate-Limit CTA modal with
+//    detail.queries_used; 'rate_limited' (the server's per-minute flood guard) starts the short countdown, reading Retry-After from the body
+//  * HTTP 503 is reserved for the kill switch ('demo_paused': paused notice). A busy solver answers 423 'solver_busy' (its own retry notice)
 // No cookies, no storage, no credentials are ever sent.
 
-export const API_BASE = (import.meta.env?.VITE_API_BASE_URL ?? '').replace(/\/+$/, '')
+export const API_BASE = (import.meta.env?.VITE_API_BASE ?? '').replace(/\/+$/, '')
 export const SERVER_DEADLINE_S = 25
 export const SOLVE_TIMEOUT_MS = (SERVER_DEADLINE_S + 15) * 1000
 
 export class ApiError extends Error {
-  constructor({ code, message, details = {}, status = 0, requestId = null, retryAfter = null }) {
+  constructor({ code, message, details = {}, status = 0, requestId = null, retryAfter = null, queriesUsed = null }) {
     super(message)
     this.name = 'ApiError'
     this.code = code
@@ -19,6 +21,7 @@ export class ApiError extends Error {
     this.status = status
     this.requestId = requestId
     this.retryAfter = retryAfter // seconds, only for 429
+    this.queriesUsed = queriesUsed // only for ai_quota_reached: the active limit, read from the backend (never a client-side counter)
   }
   /** Message for display, with the request id so a failure can be traced in the server log. */
   get display() {
@@ -31,6 +34,17 @@ export const isAborted = (e) => e instanceof ApiError && e.code === 'aborted'
 /** Turn any failed response into an ApiError. `body` is the parsed JSON, a string, or null. */
 export function normaliseError({ status, body, requestId = null, path = '' }) {
   const err = body && typeof body === 'object' ? body.error : null
+  // The shared rate-limit engine's contract: 429 {detail: {message, queries_used}} and 503 {detail: {message}} (kill switch).
+  const detail = body && typeof body === 'object' && body.detail && typeof body.detail === 'object' ? body.detail : null
+  if (status === 429 && (err?.code === 'ai_quota_reached' || (detail && 'queries_used' in detail))) {
+    const used = Number(detail?.queries_used ?? err?.details?.queries_used)
+    return new ApiError({ code: 'ai_quota_reached', status, requestId: err?.request_id ?? requestId, queriesUsed: Number.isFinite(used) ? used : null,
+      message: String(err?.message ?? detail?.message ?? 'You have used all the AI requests for this demo.') })
+  }
+  if (status === 503 && (err?.code === 'demo_paused' || (!err && detail?.message))) {
+    return new ApiError({ code: 'demo_paused', status, requestId: err?.request_id ?? requestId,
+      message: String(detail?.message ?? err?.message ?? 'This demo is temporarily paused. Check back soon.') })
+  }
   // HTTP 404 means THIS server has no such route: the server was started from older code than this page, or the page points at the wrong server. Say so; do not just print "Not found".
   if (status === 404 && (err?.code === 'not_found' || typeof body === 'string' || body?.detail === 'Not Found')) return new ApiError({ code: 'server_outdated', status, requestId, message: `The server has no "${path || 'such'}" feature. It is older than this page (or this page points at the wrong server). Restart the backend from the latest code and reload.` })
   if (err && typeof err === 'object' && typeof err.code === 'string') {
@@ -55,8 +69,16 @@ let cityProvider = null
 export function setCityProvider(fn) { cityProvider = fn }
 
 let rateLimitHandler = () => {}
-/** The store registers a function that starts a visible countdown when the server answers 429. */
+/** The store registers a function that starts a visible countdown when the server's per-minute flood guard answers 429 rate_limited. */
 export function setRateLimitHandler(fn) { rateLimitHandler = fn }
+
+let quotaHandler = () => {}
+/** The store registers a function that opens the Rate-Limit CTA modal when the AI quota is used up (429 ai_quota_reached). */
+export function setQuotaHandler(fn) { quotaHandler = fn }
+
+let pausedHandler = () => {}
+/** The store registers a function that shows the "demo paused" notice (503 demo_paused). Never the CTA, never for solver_busy. */
+export function setPausedHandler(fn) { pausedHandler = fn }
 
 const inflight = new Map()
 /** Cancel whatever request is currently in flight for a key (used when inputs change). */
@@ -97,7 +119,9 @@ export async function request(method, path, { body, key, timeoutMs = SOLVE_TIMEO
     try { parsed = text ? JSON.parse(text) : null } catch { parsed = text }
     if (!res.ok) {
       const err = normaliseError({ status: res.status, body: parsed, requestId: res.headers?.get?.('x-request-id') ?? null, path })
-      if (err.code === 'rate_limited' || res.status === 429) rateLimitHandler(err.retryAfter ?? 10)
+      if (err.code === 'ai_quota_reached') quotaHandler(err.queriesUsed)
+      else if (err.code === 'demo_paused') pausedHandler(err.message)
+      else if (err.code === 'rate_limited' || res.status === 429) rateLimitHandler(err.retryAfter ?? 10)
       throw err
     }
     if (parsed === null || typeof parsed !== 'object') throw new ApiError({ code: 'unexpected_response', message: 'The server sent a response the app could not read.', status: res.status })
