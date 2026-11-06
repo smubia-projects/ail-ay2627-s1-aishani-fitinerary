@@ -27,7 +27,7 @@ from app.fingerprint import stamp, plan_fingerprint
 from app.hardening.disconnect import run_cancellable
 from app.optimiser.cost_summary import summarise_costs
 from app.hardening.solver_capacity import SolverCapacity
-from app.llm.client import LLMClient
+from app.llm.client import OPENROUTER_HOST, LLMClient
 from app.llm.explain import OptimiseView, explain
 from app.llm.extract import extract_preferences
 from app.llm.parse_replan import parse_replan
@@ -70,11 +70,10 @@ def health(request: Request):
     st = get_settings()  # never echoes the key
     limit = request.app.state.llm_budget.exhausted()
     mode = "llm" if (st.llm_enabled and not limit) else "sample"
-    ep = st.endpoint
     out = {"status": "ok", "mode": mode, "llm_configured": st.llm_enabled, "llm_mode": mode, "llm_limit_reached": bool(st.llm_enabled and limit)}
     if st.llm_enabled:  # the host only: never the key, never the full URL
-        out["llm_endpoint"] = ep.host
-        out["llm_relay"] = ep.relay
+        out["llm_endpoint"] = OPENROUTER_HOST
+        out["llm_relay"] = True  # OpenRouter is a third-party gateway between this app and the model provider
         out["llm_model"] = st.llm_model  # the model name only: never the key, never the URL
     return out
 
@@ -560,8 +559,7 @@ def create_app(cfg: HConfig | None = None, data_loader=load_all_city_datasets) -
         app.state.dataset = app.state.datasets[DEFAULT_CITY_ID]  # legacy test/helper compatibility
         log.info("startup", extra={"startup_seconds": round(time.perf_counter() - t0, 3), **cfg.summary(get_settings().mode)})
         if get_settings().llm_enabled:
-            ep = get_settings().endpoint
-            log.info("llm_endpoint", extra={"host": ep.host, "relay": ep.relay})  # host only
+            log.info("llm_endpoint", extra={"host": OPENROUTER_HOST, "relay": True, "model": get_settings().llm_model})  # host and model only
         yield
 
     docs = {} if cfg.docs_enabled else {"docs_url": None, "redoc_url": None, "openapi_url": None}

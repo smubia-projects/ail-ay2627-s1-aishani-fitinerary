@@ -1,19 +1,24 @@
-"""LLM client: one-method Protocol, an Anthropic SDK implementation, and a safe error type.
+"""LLM client: one-method Protocol, an OpenRouter implementation, and a safe error type.
 
-No tools, no web access, no streaming. SDK auto-retries are disabled (max_retries=0) so the per-request call caps
-in config.py are exact. Any failure raises LLMUnavailable with a safe message; callers fall back to sample mode.
+All model calls go through apiyi's OpenAI-compatible /chat/completions endpoint (https://api.apiyi.com/v1).
+No tools, no web access, no streaming, no automatic retries, so the per-request call caps in config.py are exact.
+Any failure raises LLMUnavailable with a safe message; callers fall back to sample mode.
 The API key is never put in messages, logs or repr().
 """
 import logging
 import os
 import time
+from functools import lru_cache
+from urllib.parse import urlparse
 from dataclasses import dataclass
 from typing import Protocol
 
 from app import config
-from app.llm.endpoint import Endpoint, resolve_endpoint
 
 log = logging.getLogger("app.llm")  # metadata only: never prompts, user text or keys
+
+OPENROUTER_BASE_URL = (os.environ.get("API_BASE_URL", "").strip() or os.environ.get("OPENROUTER_BASE_URL", "").strip() or "https://api.apiyi.com/v1").rstrip("/")
+OPENROUTER_HOST = urlparse(OPENROUTER_BASE_URL).hostname or "openrouter.ai"
 
 
 class LLMUnavailable(Exception):
@@ -41,91 +46,78 @@ class LLMClient(Protocol):
     def complete(self, system: str, messages: list[dict], max_tokens: int) -> LLMResponse: ...
 
 
-def default_effort(model: str) -> str:
-    """The effort default: "low" where the model accepts the parameter. Haiku models reject it (HTTP 400 "does not support the effort
-    parameter", seen through a gateway), so none is sent for them."""
-    return "" if "haiku" in model.lower() else config.LLM_EFFORT_DEFAULT
-
-
-def effective_effort(model: str, configured: str | None) -> tuple[str, str | None]:
-    """(effort to send, a warning or None). An explicit LLM_EFFORT (even empty) wins, except for Haiku models, which always reject it."""
-    if configured is None:
-        return default_effort(model), None
-    if configured and "haiku" in model.lower():
-        return "", "LLM_EFFORT is set but Haiku models reject the effort parameter, so it is not sent."
-    return configured, None
-
-
-def _provider_error(e) -> dict:
-    """The provider's error type and a short message, for the live scripts. Truncated; the request (prompt, key) is never part of it."""
-    body = getattr(e, "body", None)
+def _provider_error(body) -> dict:
+    """OpenRouter's error code and a short message, for the live scripts. Truncated; the request (prompt, key) is never part of it."""
     err = body.get("error", body) if isinstance(body, dict) else {}
-    etype = err.get("type") if isinstance(err, dict) else None
+    etype = err.get("code") or err.get("type") if isinstance(err, dict) else None
     msg = err.get("message") if isinstance(err, dict) else None
-    return {"error_type": str(etype)[:60] if etype else None, "detail": str(msg or getattr(e, "message", "") or "")[:240] or None}
+    return {"error_type": str(etype)[:60] if etype else None, "detail": str(msg or "")[:240] or None}
 
 
-class AnthropicLLMClient:
-    """Anthropic SDK wrapper. Reads LLM_API_KEY / LLM_MODEL (and optional LLM_EFFORT) from the environment."""
+class OpenRouterLLMClient:
+    """OpenRouter chat-completions client. Reads OPENROUTER_API_KEY and LLM_MODEL from the environment."""
 
-    def __init__(self, api_key: str, model: str, effort: str = config.LLM_EFFORT_DEFAULT,
-                 timeout: float = config.LLM_TIMEOUT_SECONDS, endpoint: Endpoint | None = None):
-        import anthropic  # imported lazily so sample mode and tests never need the SDK to be configured
+    endpoint_host = OPENROUTER_HOST
+    relay = True  # OpenRouter is a third-party gateway: the cleaned text and computed facts pass through it to the model provider
+
+    def __init__(self, api_key: str, model: str = config.DEFAULT_LLM_MODEL, timeout: float = config.LLM_TIMEOUT_SECONDS, transport=None):
+        import httpx  # imported lazily so sample mode never needs it configured
 
         self.model = model
-        self._effort = effort
-        self.endpoint = endpoint or resolve_endpoint(None)
-        self.endpoint_host = self.endpoint.host
-        kwargs = {"base_url": self.endpoint.base_url} if self.endpoint.base_url else {}  # unset: exactly the SDK default, as before
-        self._client = anthropic.Anthropic(api_key=api_key, timeout=timeout, max_retries=0, **kwargs)
+        self._client = httpx.Client(
+            base_url=OPENROUTER_BASE_URL, timeout=timeout, transport=transport,
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
+                     "HTTP-Referer": "https://www.smubia.com/ai-lodge", "X-Title": "Fitinerary"})
 
     def __repr__(self) -> str:  # never expose the key
-        return f"AnthropicLLMClient(model={self.model!r}, endpoint={self.endpoint_host!r}, api_key='***')"
+        return f"OpenRouterLLMClient(model={self.model!r}, endpoint={self.endpoint_host!r}, api_key='***')"
 
     @classmethod
-    def from_env(cls) -> "AnthropicLLMClient | None":
-        key, model = os.environ.get("LLM_API_KEY", ""), os.environ.get("LLM_MODEL", "")
-        if not (key and model):
+    def from_env(cls) -> "OpenRouterLLMClient | None":
+        key = (os.environ.get("API_KEY", "").strip() or os.environ.get("OPENROUTER_API_KEY", "")).strip()
+        if not key:
             return None
-        effort, effort_warning = effective_effort(model, os.environ.get("LLM_EFFORT"))
-        if effort_warning:
-            log.warning("llm_effort_ignored", extra={"model": model, "note": effort_warning})
-        endpoint = resolve_endpoint(os.environ.get("LLM_BASE_URL"))
-        if endpoint.error:  # refused: stay in sample mode rather than send a key or text to an unsafe address
-            log.error("llm_endpoint_refused", extra={"reason": endpoint.error})
-            return None
-        for w in endpoint.warnings:
-            log.warning("llm_endpoint_normalised", extra={"host": endpoint.host, "note": w})
-        return cls(key, model, effort, endpoint=endpoint)
+        return _cached_client(key, (os.environ.get("MODEL_NAME", "").strip() or os.environ.get("LLM_MODEL", "")).strip() or config.DEFAULT_LLM_MODEL)
 
     def complete(self, system: str, messages: list[dict], max_tokens: int) -> LLMResponse:
-        import anthropic
+        import httpx
 
-        kwargs = dict(model=self.model, max_tokens=max_tokens, system=system, messages=messages)
-        if self._effort:
-            kwargs["output_config"] = {"effort": self._effort}
+        payload = {"model": self.model, "max_tokens": max_tokens, "messages": [{"role": "system", "content": system}, *messages]}
         t0 = time.perf_counter()
         try:
-            resp = self._client.messages.create(**kwargs)
-        except anthropic.APITimeoutError:
+            resp = self._client.post("/chat/completions", json=payload)
+        except httpx.TimeoutException:
             raise LLMUnavailable("timeout") from None
-        except anthropic.RateLimitError:
-            raise LLMUnavailable("rate_limited") from None
-        except anthropic.AuthenticationError:
-            raise LLMUnavailable("authentication") from None
-        except anthropic.APIConnectionError:
+        except httpx.TransportError:
             raise LLMUnavailable("network") from None
-        except anthropic.APIStatusError as e:
-            raise LLMUnavailable("api_error", status=getattr(e, "status_code", None), **_provider_error(e)) from None
-        except Exception:  # never let an SDK detail (which could echo request data) escape
+        except Exception:  # never let a client detail (which could echo request data) escape
             raise LLMUnavailable("error") from None
-        text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
-        usage = getattr(resp, "usage", None)
-        return LLMResponse(text=text, input_tokens=getattr(usage, "input_tokens", 0) or 0,
-                           output_tokens=getattr(usage, "output_tokens", 0) or 0,
-                           latency_seconds=round(time.perf_counter() - t0, 3), stop_reason=getattr(resp, "stop_reason", None))
+        try:
+            body = resp.json()
+        except ValueError:
+            body = None
+        if resp.status_code in (401, 403):
+            raise LLMUnavailable("authentication", status=resp.status_code, **_provider_error(body))
+        if resp.status_code == 429:
+            raise LLMUnavailable("rate_limited", status=429, **_provider_error(body))
+        if resp.status_code >= 400 or not isinstance(body, dict) or body.get("error") or not body.get("choices"):
+            raise LLMUnavailable("api_error", status=resp.status_code, **_provider_error(body))
+        choice = body["choices"][0] or {}
+        content = (choice.get("message") or {}).get("content")
+        if isinstance(content, list):  # some providers return content parts
+            content = "".join(p.get("text", "") for p in content if isinstance(p, dict))
+        usage = body.get("usage") or {}
+        return LLMResponse(text=content or "", input_tokens=int(usage.get("prompt_tokens") or 0),
+                           output_tokens=int(usage.get("completion_tokens") or 0),
+                           latency_seconds=round(time.perf_counter() - t0, 3), stop_reason=choice.get("finish_reason"))
+
+
+@lru_cache(maxsize=4)
+def _cached_client(key: str, model: str) -> OpenRouterLLMClient:
+    """One pooled HTTP client per (key, model), instead of a new connection pool on every request."""
+    return OpenRouterLLMClient(key, model)
 
 
 def get_llm_client() -> "LLMClient | None":
     """FastAPI dependency. Tests override it (app.dependency_overrides) with a mock. None = sample mode."""
-    return AnthropicLLMClient.from_env()
+    return OpenRouterLLMClient.from_env()

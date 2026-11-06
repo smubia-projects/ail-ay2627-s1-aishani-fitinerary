@@ -3,14 +3,15 @@ import dataclasses
 import logging
 import socket
 
-import anthropic
-import httpx2
+import json
+
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
 from app import config
 from app.data.loader import load_dataset
-from app.llm.client import AnthropicLLMClient, LLMUnavailable, get_llm_client
+from app.llm.client import OpenRouterLLMClient, LLMUnavailable, get_llm_client
 from app.llm.explain import explain
 from app.llm.extract import extract_preferences
 from app.llm.parse_replan import parse_replan
@@ -53,7 +54,7 @@ def test_the_test_suite_blocks_the_network_and_has_no_api_key():
     with pytest.raises(RuntimeError, match="blocked"):
         socket.create_connection(("example.com", 80))
     import os
-    assert not os.environ.get("LLM_API_KEY") and not os.environ.get("ANTHROPIC_API_KEY")
+    assert not os.environ.get("OPENROUTER_API_KEY")
     assert get_llm_client() is None  # no key -> sample mode
 
 
@@ -62,7 +63,7 @@ def test_health_reports_sample_mode_and_never_echoes_a_key(monkeypatch):
     with TestClient(app) as c:
         j = c.get("/health").json()
         assert j == {"status": "ok", "mode": "sample", "llm_configured": False, "llm_mode": "sample", "llm_limit_reached": False}
-        monkeypatch.setenv("LLM_API_KEY", KEY)
+        monkeypatch.setenv("OPENROUTER_API_KEY", KEY)
         monkeypatch.setenv("LLM_MODEL", "some-model")
         r = c.get("/health")
         assert r.json()["llm_configured"] is True and r.json()["llm_mode"] == "llm"
@@ -122,74 +123,62 @@ def test_explain_via_api_uses_the_result_computed_server_side_not_client_supplie
     assert "Unnecessarily moved" in mock.calls[0]["messages"][0]["content"]  # facts came from the computed diff
 
 
-# ---- SDK wrapper hygiene -----------------------------------------------------------------------------------------------------
-class _Block:
-    type = "text"
-
-    def __init__(self, t):
-        self.text = t
+# ---- OpenRouter client hygiene (httpx MockTransport: no socket is ever opened) ---------------------------------------------------
+def _or_client(handler, model="model-x"):
+    return OpenRouterLLMClient(KEY, model, transport=httpx.MockTransport(handler))
 
 
-class _FakeSDK:
-    last = None
+def test_openrouter_client_sends_no_tools_no_sampling_params_and_caps_tokens():
+    seen = {}
 
-    def __init__(self, **kw):
-        _FakeSDK.last = self
-        self.init, self.create_kwargs, self.raise_exc = kw, None, None
-        self.messages = self
+    def handler(req):
+        seen["url"], seen["auth"], seen["body"] = str(req.url), req.headers["authorization"], json.loads(req.content)
+        return httpx.Response(200, json={"choices": [{"message": {"content": '{"ok": 1}'}, "finish_reason": "stop"}],
+                                         "usage": {"prompt_tokens": 7, "completion_tokens": 3}})
 
-    def create(self, **kw):
-        self.create_kwargs = kw
-        if self.raise_exc:
-            raise self.raise_exc
-        return type("R", (), {"content": [_Block('{"ok": 1}')], "usage": type("U", (), {"input_tokens": 7, "output_tokens": 3})(), "stop_reason": "end_turn"})()
-
-
-def test_sdk_wrapper_sends_no_tools_no_sampling_params_no_sdk_retries_and_caps_tokens(monkeypatch):
-    monkeypatch.setattr(anthropic, "Anthropic", _FakeSDK)
-    c = AnthropicLLMClient(KEY, "model-x")
-    resp = c.complete("SYS", [{"role": "user", "content": "hi"}], 321)
-    kw = _FakeSDK.last.create_kwargs
-    assert set(kw) == {"model", "max_tokens", "system", "messages", "output_config"}
-    assert kw["max_tokens"] == 321 and kw["output_config"] == {"effort": "low"} and kw["model"] == "model-x"
-    assert "tools" not in kw and "temperature" not in kw and "tool_choice" not in kw
-    assert _FakeSDK.last.init["max_retries"] == 0 and _FakeSDK.last.init["timeout"] == config.LLM_TIMEOUT_SECONDS
-    assert resp.text == '{"ok": 1}' and resp.input_tokens == 7 and resp.output_tokens == 3
+    resp = _or_client(handler).complete("SYS", [{"role": "user", "content": "hi"}], 321)
+    body = seen["body"]
+    assert seen["url"] == "https://api.apiyi.com/v1/chat/completions" and seen["auth"] == f"Bearer {KEY}"
+    assert set(body) == {"model", "max_tokens", "messages"} and body["max_tokens"] == 321 and body["model"] == "model-x"
+    assert body["messages"] == [{"role": "system", "content": "SYS"}, {"role": "user", "content": "hi"}]
+    assert resp.text == '{"ok": 1}' and resp.input_tokens == 7 and resp.output_tokens == 3 and resp.stop_reason == "stop"
 
 
-def test_sdk_failures_become_llm_unavailable_with_safe_messages_and_no_key(monkeypatch):
-    monkeypatch.setattr(anthropic, "Anthropic", _FakeSDK)
-    c = AnthropicLLMClient(KEY, "model-x")
-    req = httpx2.Request("POST", "https://api.anthropic.com/v1/messages", headers={"x-api-key": KEY})
-    for exc, cat in [(anthropic.APITimeoutError(request=req), "timeout"), (anthropic.APIConnectionError(request=req), "network"),
-                     (Exception(f"boom {KEY}"), "error"), (ValueError(KEY), "error")]:
-        _FakeSDK.last.raise_exc = exc
+def test_openrouter_failures_become_llm_unavailable_with_safe_messages_and_no_key():
+    def raiser(exc):
+        def h(req):
+            raise exc
+        return h
+    cases = [(raiser(httpx.ReadTimeout(f"timeout {KEY}")), "timeout"), (raiser(httpx.ConnectError(f"refused {KEY}")), "network"),
+             (raiser(ValueError(KEY)), "error"),
+             (lambda r: httpx.Response(401, json={"error": {"code": 401, "message": "No auth"}}), "authentication"),
+             (lambda r: httpx.Response(429, json={"error": {"code": 429, "message": "slow down"}}), "rate_limited"),
+             (lambda r: httpx.Response(400, json={"error": {"code": 400, "message": "not a valid model ID"}}), "api_error"),
+             (lambda r: httpx.Response(200, json={"error": {"code": 502, "message": "upstream"}}), "api_error"),
+             (lambda r: httpx.Response(200, text="not json"), "api_error")]
+    for handler, cat in cases:
         with pytest.raises(LLMUnavailable) as e:
-            c.complete("s", [{"role": "user", "content": "u"}], 10)
+            _or_client(handler).complete("s", [{"role": "user", "content": "u"}], 10)
         assert e.value.category == cat and KEY not in str(e.value) and KEY not in repr(e.value)
         assert e.value.__cause__ is None  # the original exception (which could echo request data) is not chained
 
 
 def test_key_never_appears_in_repr_or_dataclass_dumps():
-    c = AnthropicLLMClient(KEY, "model-x")
+    c = OpenRouterLLMClient(KEY, "model-x")
     assert KEY not in repr(c) and KEY not in str(c) and "***" in repr(c)
 
 
-def test_from_env_requires_both_key_and_model(monkeypatch):
-    assert AnthropicLLMClient.from_env() is None
-    monkeypatch.setenv("LLM_API_KEY", KEY)
-    assert AnthropicLLMClient.from_env() is None
-    monkeypatch.setenv("LLM_MODEL", "m")
-    assert AnthropicLLMClient.from_env().model == "m"
-    monkeypatch.setenv("LLM_EFFORT", "")
-    monkeypatch.setattr(anthropic, "Anthropic", _FakeSDK)
-    AnthropicLLMClient.from_env().complete("s", [{"role": "user", "content": "u"}], 5)
-    assert "output_config" not in _FakeSDK.last.create_kwargs  # empty LLM_EFFORT: parameter omitted
+def test_from_env_needs_the_key_and_defaults_the_model(monkeypatch):
+    assert OpenRouterLLMClient.from_env() is None
+    monkeypatch.setenv("OPENROUTER_API_KEY", KEY)
+    assert OpenRouterLLMClient.from_env().model == config.DEFAULT_LLM_MODEL
+    monkeypatch.setenv("LLM_MODEL", "gemini-3.5-flash-lite")
+    assert OpenRouterLLMClient.from_env().model == "gemini-3.5-flash-lite"
 
 
 # ---- logging and persistence -----------------------------------------------------------------------------------------------------
 def test_logs_contain_metadata_only_never_user_text_prompts_or_keys(caplog, monkeypatch):
-    monkeypatch.setenv("LLM_API_KEY", KEY)
+    monkeypatch.setenv("OPENROUTER_API_KEY", KEY)
     marker = "MARKER_USER_TEXT_98765 visit the Sensoji"
     p, cur = base_case()
     with caplog.at_level(logging.DEBUG):

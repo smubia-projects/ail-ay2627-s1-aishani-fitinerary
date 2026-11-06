@@ -185,8 +185,8 @@ def main(argv=None):
         if msg:
             print(msg)
             return 0
-        from app.llm.client import AnthropicLLMClient
-        client = lc.Capped(AnthropicLLMClient.from_env(), LIVE_CAP)
+        from app.llm.client import OpenRouterLLMClient
+        client = lc.Capped(OpenRouterLLMClient.from_env(), LIVE_CAP)
         meta["mode"] = f"LIVE model {client.model}"
     res = run(rows, client)
     out = Path(a.out)

@@ -110,7 +110,7 @@ def test_the_live_run_splits_code_handled_from_model_called_per_city_and_never_o
             body = {"days": 3 if "3 days" in messages[0]["content"] else 2, "budget": None, "pace": None, "interests": [], "must_visit_names": [], "skip_names": [], "day_start": None,
                     "day_end": None, "value_of_time": None, "max_walking_minutes": None, "unclear": []}
             return LLMResponse(text=json.dumps(body), input_tokens=1, output_tokens=1, latency_seconds=0.0)
-    monkeypatch.setattr("app.llm.client.AnthropicLLMClient.from_env", staticmethod(lambda: Fake()))
+    monkeypatch.setattr("app.llm.client.OpenRouterLLMClient.from_env", staticmethod(lambda: Fake()))
     assert sh.main(["--live", "--label", "holdout1"]) == 0
     t = next(tmp_path.glob("holdout-results-*-holdout1.md")).read_text()
     for needle in ("(LIVE model)", "Model: `fake-model`", "relay.example.test", "PROMPT_VERSION", "Calls used: 2 of a hard cap of", "N = 3 prompts"):

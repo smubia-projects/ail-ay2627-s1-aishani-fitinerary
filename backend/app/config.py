@@ -6,7 +6,10 @@ from dataclasses import dataclass
 SAMPLE_FX_JPY_PER_SGD = 110.0
 FX_LABEL = "SAMPLE FX rate (approximate, not live): 1 SGD = 110 JPY"
 
-# CORS origins come from the ALLOWED_ORIGINS env var (see app/hardening/config.py).
+# CORS origins come from the CORS_ORIGINS env var (see app/hardening/config.py).
+
+# Any OpenRouter model id; override with LLM_MODEL. The prompts and the safety log were tuned on Claude Haiku 4.5.
+DEFAULT_LLM_MODEL = "claude-haiku-4-5-20251001"
 
 
 def _int_env(name: str, default: int) -> int:
@@ -24,16 +27,10 @@ class Settings:
     llm_model: str
     max_input_chars: int
     rate_limit_per_min: int
-    llm_base_url: str = ""
-
-    @property
-    def endpoint(self):
-        from app.llm.endpoint import resolve_endpoint  # local import: config is imported very early
-        return resolve_endpoint(self.llm_base_url)
 
     @property
     def llm_enabled(self) -> bool:
-        return bool(self.llm_api_key and self.llm_model and not self.endpoint.error)
+        return bool(self.llm_api_key and self.llm_model)
 
     @property
     def mode(self) -> str:
@@ -42,9 +39,8 @@ class Settings:
 
 def get_settings() -> Settings:
     return Settings(
-        llm_api_key=os.environ.get("LLM_API_KEY", ""),
-        llm_model=os.environ.get("LLM_MODEL", ""),
-        llm_base_url=os.environ.get("LLM_BASE_URL", ""),
+        llm_api_key=(os.environ.get("API_KEY", "").strip() or os.environ.get("OPENROUTER_API_KEY", "")).strip(),
+        llm_model=(os.environ.get("MODEL_NAME", "").strip() or os.environ.get("LLM_MODEL", "")).strip() or DEFAULT_LLM_MODEL,
         max_input_chars=_int_env("MAX_INPUT_CHARS", 2000),
         rate_limit_per_min=_int_env("RATE_LIMIT_PER_MIN", 30),
     )
@@ -104,9 +100,7 @@ UNKNOWN_PRICE_PLACEHOLDER_OVERRIDE_JPY: int | None = None
 # ---------------------------------------------------------------------------
 # LLM layer (Phase 5)
 # ---------------------------------------------------------------------------
-# NOTE: no temperature/top_p is sent: current Claude models reject sampling parameters. Determinism comes from
-# low effort, a strict JSON schema in code, and validation, not from sampling settings.
-LLM_EFFORT_DEFAULT = "low"            # override with LLM_EFFORT env ("" = send no effort parameter)
+# NOTE: no temperature/top_p is sent. Determinism comes from a strict JSON schema in code and validation, not from sampling settings.
 LLM_TIMEOUT_SECONDS = 10.0
 LLM_MAX_TOKENS_EXTRACT = 2000         # thinking tokens count toward max_tokens, so keep headroom
 LLM_MAX_TOKENS_EXPLAIN = 1200

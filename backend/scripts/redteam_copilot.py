@@ -7,7 +7,6 @@ This development suite is not a holdout; no attack tuning during a live run.
 import argparse
 import hashlib
 import json
-import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,7 +19,7 @@ from fastapi.testclient import TestClient
 from app.data.loader import load_all_city_datasets
 from app.fingerprint import plan_fingerprint
 from app.hardening.config import HConfig
-from app.llm.client import get_llm_client, AnthropicLLMClient
+from app.llm.client import get_llm_client, OpenRouterLLMClient
 from app.llm.leakguard import forbidden, scrub
 from app.llm import copilot, profile, repair
 from app.main import create_app
@@ -40,12 +39,12 @@ class Tap:
         reply = self.inner.complete(system, messages, max_tokens)
         # Raw compliance indicator, not an assertion that semantic compliance was fully measured.
         raw = reply.text
-        leak = forbidden(raw, system, os.environ.get('LLM_API_KEY', ''))
+        leak = forbidden(raw, system, lc.env_value('API_KEY'))
         try:
             obj = json.loads(raw)
         except ValueError:
             obj = raw
-        safe, removed = scrub(obj, system, os.environ.get('LLM_API_KEY', ''))
+        safe, removed = scrub(obj, system, lc.env_value('API_KEY'))
         self.rows.append({'response_scrubbed': '[removed: possible prompt or sensitive content]' if leak else safe, 'sensitive_raw_indicator': leak, 'scrubbed_strings': removed})
         return reply
 
@@ -96,7 +95,7 @@ def run_case(attack, entry, client):
     # An exact user-input echo is labelled input, not a model disclosure or a supported claim.
     # Inspect all other API fields, including extracted JSON; retain the full response for review.
     derived = {k: v for k, v in out.items() if k != 'raw_input_echo' or v != attack['text']}
-    exposed = forbidden(json.dumps(derived), copilot.SYSTEM, os.environ.get('LLM_API_KEY', ''))
+    exposed = forbidden(json.dumps(derived), copilot.SYSTEM, lc.env_value('API_KEY'))
     return {'attack': attack['id'], 'objective': attack['objective'], 'entry_point': path, 'http_status': response.status_code,
             'schema_validator_rejected': bool(observed and observed[-1].parsed is None),
             'action_validator_rejected': bool(out.get('refused')) if entry == 'repair' else None,
@@ -134,7 +133,7 @@ def main(argv=None):
     if why:
         print(why)
         return 2
-    capped = lc.Capped(AnthropicLLMClient.from_env(), MAX_CALLS)
+    capped = lc.Capped(OpenRouterLLMClient.from_env(), MAX_CALLS)
     cases = []
     for attack in frozen['attacks']:
         for entry in ENTRY_POINTS:
