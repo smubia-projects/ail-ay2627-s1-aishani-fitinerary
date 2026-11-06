@@ -1,7 +1,8 @@
-// Writes the static-host config next to the build: _headers (security headers + CSP) and _redirects (single-page-app rewrite).
-// Format verified against the Netlify docs: a `_headers` file in the publish directory; `/*  /index.html  200` for the SPA rewrite.
-// The CSP allows only this site, the OpenStreetMap tile server (tile images, and the single probe request that decides whether to show them) and the configured API origin (VITE_API_BASE_URL).
-// Usage: node scripts/write-host-config.mjs [outDir=dist]     (runs automatically after `npm run build`)
+// LOCAL TEST HARNESS ONLY. Production headers live in frontend/vercel.json (Vercel does not read these files).
+// Writes _headers (security headers + CSP) and _redirects (single-page-app rewrite) next to a local build so the e2e CSP test and
+// the Lighthouse script can serve the build with the same policy as production. Keep the CSP here in step with vercel.json; the only
+// difference is connect-src: vercel.json allows https://*.run.app (any Cloud Run URL), this harness allows the exact VITE_API_BASE origin.
+// Usage: node scripts/write-host-config.mjs [outDir=dist]
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -34,15 +35,15 @@ export function writeHostConfig({ outDir, apiBase }) {
 function envFromFile(root) {
   const f = join(root, '.env')
   if (!existsSync(f)) return null
-  const m = /^VITE_API_BASE_URL=(.*)$/m.exec(readFileSync(f, 'utf8'))
+  const m = /^VITE_API_BASE=(.*)$/m.exec(readFileSync(f, 'utf8'))
   return m ? m[1].trim() : null
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   const root = resolve(import.meta.dirname, '..')
   const outDir = resolve(root, process.argv[2] ?? 'dist')
-  const apiBase = process.env.VITE_API_BASE_URL ?? envFromFile(root)
+  const apiBase = process.env.VITE_API_BASE ?? envFromFile(root)
   const { api } = writeHostConfig({ outDir, apiBase })
-  if (!api) console.warn('WARNING: VITE_API_BASE_URL is not set, so the CSP only allows this site: the app cannot reach the API. Set it for the build.')
+  if (!api) console.warn('WARNING: VITE_API_BASE is not set, so the CSP only allows this site: the app cannot reach the API. Set it for the build.')
   else console.log(`host config written to ${outDir} (API origin allowed by CSP: ${api})`)
 }

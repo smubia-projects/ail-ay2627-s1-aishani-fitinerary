@@ -34,7 +34,7 @@ try {
 
   const cors = await fetch(`${backend}/data/places`, { headers: { Origin: origin } })
   check('CORS allows exactly the frontend origin', cors.headers.get('access-control-allow-origin') === origin,
-    `allow-origin=${cors.headers.get('access-control-allow-origin') ?? 'none'}; set ALLOWED_ORIGINS=${origin} on the backend`)
+    `allow-origin=${cors.headers.get('access-control-allow-origin') ?? 'none'}; set CORS_ORIGINS=${origin} on the backend`)
   const other = await fetch(`${backend}/data/places`, { headers: { Origin: 'https://example.invalid' } })
   check('CORS refuses other origins', other.headers.get('access-control-allow-origin') === null)
   const places = await cors.json().catch(() => null)

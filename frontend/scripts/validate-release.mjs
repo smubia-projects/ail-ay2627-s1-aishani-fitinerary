@@ -29,12 +29,12 @@ function gitRev(root) {
   try { return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() } catch { return null }
 }
 
-export function validateRelease({ root = resolve(import.meta.dirname, '..', '..'), dist = resolve(root, 'frontend', 'dist'), apiBase = process.env.VITE_API_BASE_URL } = {}) {
+export function validateRelease({ root = resolve(import.meta.dirname, '..', '..'), dist = resolve(root, 'frontend', 'dist'), apiBase = process.env.VITE_API_BASE } = {}) {
   const errors = []
   const api = (() => { try { return apiBase ? new URL(apiBase) : null } catch { return null } })()
-  if (!api) errors.push('VITE_API_BASE_URL must be set to the production backend URL.')
-  else if (api.protocol !== 'https:') errors.push('VITE_API_BASE_URL must use HTTPS for a production release.')
-  else if (/localhost|127\.0\.0\.1|\[::1\]/.test(api.host)) errors.push('VITE_API_BASE_URL must not point at a local development server.')
+  if (!api) errors.push('VITE_API_BASE must be set to the production backend URL.')
+  else if (api.protocol !== 'https:') errors.push('VITE_API_BASE must use HTTPS for a production release.')
+  else if (/localhost|127\.0\.0\.1|\[::1\]/.test(api.host)) errors.push('VITE_API_BASE must not point at a local development server.')
 
   for (const rel of ['_headers', '_redirects', 'proof-data/manifest.json', 'proof-data/backend-tests-full.md', 'proof-data/eval-results.json', 'proof-data/hardening-results.md', 'proof-data/frontend-test-summary.json']) {
     if (!existsSync(join(dist, rel))) errors.push(`dist is missing ${rel}. Run npm run build:release after generating evidence.`)

@@ -190,8 +190,8 @@ async function runScreenshots(runIndex = 1) {
 }
 
 try {
-  run('.venv/bin/uvicorn app.main:app --port 8010 --log-level warning', BACK, { RATE_LIMIT_EXPENSIVE_PER_MIN: '500', RATE_LIMIT_PER_MIN: '1000', RATE_LIMIT_CHEAP_PER_MIN: '5000', LLM_API_KEY: '', LLM_MODEL: '', ALLOWED_ORIGINS: APP, SOLVER_CONCURRENCY: '1' })
-  run(`node scripts/sync-proof.mjs && VITE_API_BASE_URL=${API} npx vite build --outDir dist-shots && npx vite preview --outDir dist-shots --port 4180 --strictPort`, FRONT)
+  run('.venv/bin/uvicorn app.main:app --port 8010 --log-level warning', BACK, { RATE_LIMIT_EXPENSIVE_PER_MIN: '500', RATE_LIMIT_PER_MIN: '1000', RATE_LIMIT_CHEAP_PER_MIN: '5000', OPENROUTER_API_KEY: '', LLM_MODEL: '', CORS_ORIGINS: APP, SOLVER_CONCURRENCY: '1' })
+  run(`node scripts/sync-proof.mjs && VITE_API_BASE=${API} npx vite build --outDir dist-shots && npx vite preview --outDir dist-shots --port 4180 --strictPort`, FRONT)
   await waitFor(`${API}/health`)
   await waitFor(APP, 120_000)
   for (let i = 1; i <= repeat; i++) await runScreenshots(i)

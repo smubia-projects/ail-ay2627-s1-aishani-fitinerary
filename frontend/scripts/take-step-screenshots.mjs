@@ -111,8 +111,8 @@ async function aiFlow(browser, city, device) {
 }
 
 try {
-  run('.venv/bin/uvicorn app.main:app --port 8010 --log-level warning', BACK, { RATE_LIMIT_EXPENSIVE_PER_MIN: '500', RATE_LIMIT_PER_MIN: '1000', RATE_LIMIT_CHEAP_PER_MIN: '5000', LLM_API_KEY: '', LLM_MODEL: '', ALLOWED_ORIGINS: APP, SOLVER_CONCURRENCY: '1' })
-  run(`node scripts/sync-proof.mjs && VITE_API_BASE_URL=${API} npx vite build --outDir dist-steps && npx vite preview --outDir dist-steps --port 4181 --strictPort`, FRONT)
+  run('.venv/bin/uvicorn app.main:app --port 8010 --log-level warning', BACK, { RATE_LIMIT_EXPENSIVE_PER_MIN: '500', RATE_LIMIT_PER_MIN: '1000', RATE_LIMIT_CHEAP_PER_MIN: '5000', OPENROUTER_API_KEY: '', LLM_MODEL: '', CORS_ORIGINS: APP, SOLVER_CONCURRENCY: '1' })
+  run(`node scripts/sync-proof.mjs && VITE_API_BASE=${API} npx vite build --outDir dist-steps && npx vite preview --outDir dist-steps --port 4181 --strictPort`, FRONT)
   await waitFor(`${API}/health`)
   await waitFor(APP)
   const browser = await chromium.launch()

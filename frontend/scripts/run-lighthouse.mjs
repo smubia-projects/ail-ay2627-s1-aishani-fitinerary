@@ -47,8 +47,8 @@ const score = (lhr, key) => (lhr.categories[key]?.score === null || lhr.categori
 
 const out = { generated: new Date().toISOString(), tool: 'lighthouse ' + (await import('lighthouse/package.json', { with: { type: 'json' } })).default.version, preset: 'mobile (default), simulated throttling', pages: [] }
 try {
-  run('.venv/bin/uvicorn app.main:app --port 8011 --log-level warning', BACK, { RATE_LIMIT_EXPENSIVE_PER_MIN: '500', RATE_LIMIT_PER_MIN: '1000', RATE_LIMIT_CHEAP_PER_MIN: '5000', SOLVER_CONCURRENCY: '8', ALLOWED_ORIGINS: APP, LLM_API_KEY: '', LLM_MODEL: '' }, 'backend')
-  run(`node scripts/sync-proof.mjs && VITE_API_BASE_URL=${API} npx vite build --outDir dist-lh && VITE_API_BASE_URL=${API} node scripts/write-host-config.mjs dist-lh && npx vite preview --outDir dist-lh --port 4181 --strictPort`, FRONT, {}, 'frontend')
+  run('.venv/bin/uvicorn app.main:app --port 8011 --log-level warning', BACK, { RATE_LIMIT_EXPENSIVE_PER_MIN: '500', RATE_LIMIT_PER_MIN: '1000', RATE_LIMIT_CHEAP_PER_MIN: '5000', SOLVER_CONCURRENCY: '8', CORS_ORIGINS: APP, OPENROUTER_API_KEY: '', LLM_MODEL: '' }, 'backend')
+  run(`node scripts/sync-proof.mjs && VITE_API_BASE=${API} npx vite build --outDir dist-lh && VITE_API_BASE=${API} node scripts/write-host-config.mjs dist-lh && npx vite preview --outDir dist-lh --port 4181 --strictPort`, FRONT, {}, 'frontend')
   await waitFor(`${API}/health`)
   await waitFor(APP)
 

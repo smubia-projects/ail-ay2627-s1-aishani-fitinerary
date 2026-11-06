@@ -13,7 +13,6 @@
     "screenshots": "node scripts/take-screenshots.mjs",
     "sync-proof": "node scripts/sync-proof.mjs",
     "prebuild": "node scripts/sync-proof.mjs",
-    "postbuild": "node scripts/write-host-config.mjs",
     "test:report": "vitest run --reporter=json --outputFile=test-results/vitest.json && PLAYWRIGHT_JSON_OUTPUT_FILE=test-results/playwright.json playwright test --reporter=json && node scripts/write-test-summaries.mjs",
     "lighthouse": "node scripts/run-lighthouse.mjs",
     "live-smoke": "node scripts/live-smoke.mjs",
