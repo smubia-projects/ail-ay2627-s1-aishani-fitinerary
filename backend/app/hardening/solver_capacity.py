@@ -4,6 +4,10 @@ from threading import BoundedSemaphore, Lock
 
 from app.hardening.errors import ApiError
 
+# 423 (not 503): HTTP 503 is reserved for the shared rate-limit engine's kill switch ("demo paused"), so the frontend can never mistake
+# a busy solver for a paused demo. The error code stays "solver_busy" and the body still carries retry_after_seconds.
+SOLVER_BUSY_STATUS = 423
+
 
 class SolverCapacity:
     """Non-blocking semaphore with observable active count.
@@ -29,7 +33,7 @@ class SolverCapacity:
     def claim(self):
         if not self._sem.acquire(blocking=False):
             raise ApiError(
-                503,
+                SOLVER_BUSY_STATUS,
                 "solver_busy",
                 "The itinerary solver is busy. Please try again shortly; your request was not started.",
                 {"retry_after_seconds": self.retry_after_seconds, "active_solves": self.active, "capacity": self.limit},
