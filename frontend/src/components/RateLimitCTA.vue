@@ -8,7 +8,7 @@ const PROJECT_CONFIG = {
   emoji: '🧳',
   accentColor: '#ad472f',
   headline: 'Your trip is taking shape!',
-  description: "You've used all {count} free AI requests in this demo. The planner itself still works: compare hotels, optimise and edit your itinerary as much as you like. In SMUBIA's AI Lodge, you can learn to build AI apps like this from scratch.",
+  description: "Want to build AI that untangles hotel prices, budgets and day-by-day schedules for travellers? AI Lodge puts you in a small student team to build a real AI product and demo it at a live showcase.",
   programme: 'AI Lodge',
   programmeLink: 'https://www.smubia.com/ailodge',
   githubLink: 'https://github.com/smubia-projects/ail-ay2627-s1-aishani-fitinerary',
