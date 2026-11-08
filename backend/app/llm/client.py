@@ -83,6 +83,8 @@ class OpenRouterLLMClient:
         import httpx
 
         payload = {"model": self.model, "max_tokens": max_tokens, "messages": [{"role": "system", "content": system}, *messages]}
+        if "deepseek" in self.model.lower():
+            payload["reasoning_effort"] = "none"  # DeepSeek thinks first by default; calls run under LLM_TIMEOUT_SECONDS
         t0 = time.perf_counter()
         try:
             resp = self._client.post("/chat/completions", json=payload)

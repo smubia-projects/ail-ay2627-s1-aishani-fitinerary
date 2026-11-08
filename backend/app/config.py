@@ -9,7 +9,7 @@ FX_LABEL = "SAMPLE FX rate (approximate, not live): 1 SGD = 110 JPY"
 # CORS origins come from the CORS_ORIGINS env var (see app/hardening/config.py).
 
 # Any OpenRouter model id; override with LLM_MODEL. The prompts and the safety log were tuned on Claude Haiku 4.5.
-DEFAULT_LLM_MODEL = "claude-haiku-4-5-20251001"
+DEFAULT_LLM_MODEL = "deepseek-v4-1-flash-260910"
 
 
 def _int_env(name: str, default: int) -> int:
