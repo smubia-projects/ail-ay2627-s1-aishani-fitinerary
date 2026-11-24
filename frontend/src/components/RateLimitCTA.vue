@@ -12,7 +12,7 @@ const PROJECT_CONFIG = {
   programme: 'AI Lodge',
   programmeLink: 'https://www.smubia.com/ailodge',
   githubLink: 'https://github.com/smubia-projects/ail-ay2627-s1-aishani-fitinerary',
-  showcaseLink: 'https://www.smubia.com/Projects',
+  showcaseLink: 'https://www.smubia.com/projects',
 }
 
 const props = defineProps({ queriesMade: { type: Number, default: null } })
